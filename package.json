@@ -4,19 +4,22 @@
   "description": "PVOC in JS",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --runInBand --verbose",
     "build": "babel ./src -d dist",
-    "lint": "esw --watch ."
+    "lint": "eslint src/**/*.js --ignore-pattern \"node_modules\""
   },
   "author": "Jon Moniaci",
   "license": "ISC",
   "devDependencies": {
     "@babel/cli": "^7.12.1",
     "@babel/core": "^7.12.3",
+    "@babel/node": "^7.12.6",
     "@babel/preset-env": "^7.12.1",
     "eslint": "^7.13.0",
-    "eslint-config-airbnb-base": "^14.2.1",
-    "eslint-plugin-import": "^2.22.1",
-    "eslint-watch": "^7.0.0"
+    "eslint-plugin-jest": "^24.1.0",
+    "eslint-plugin-node": "^11.1.0",
+    "jest": "^26.6.3",
+    "jest-cli": "^26.6.3",
+    "prettier": "^2.1.2"
   }
 }
