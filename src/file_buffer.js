@@ -30,13 +30,9 @@ class FileBuffer {
     ).then((data) => {
       this.pointer = start + data.bytesRead;
 
-      // close the file and resolve with data
-      // if we are at EOF
-      if (data.bytesRead < length) {
-        return this.close().then(() => ({ ...data, eof: true }));
-      }
+      const eof = data.bytesRead < length;
 
-      return {...data, eof: false };
+      return {...data, eof };
     });
   }
 

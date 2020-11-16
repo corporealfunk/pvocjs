@@ -34,5 +34,8 @@
     "jest-cli": "^26.6.3",
     "prettier": "^2.1.2",
     "regenerator-runtime": "^0.13.7"
+  },
+  "dependencies": {
+    "float80": "^1.1.0"
   }
 }
