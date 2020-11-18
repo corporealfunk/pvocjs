@@ -91,10 +91,6 @@ class Aiff {
   // seek through file to find all chunks and populate
   // this.chunks
   async parse() {
-    /*
-    const formData = await this.parseForm();
-    */
-
     // loop all the chunks and find the ones we need, populate the data
     let eof = false;
     let nextChunkStart = 0;
