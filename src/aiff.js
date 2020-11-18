@@ -25,6 +25,63 @@ class Aiff {
         blockSize: null,        // ulong:    4 bytes
       },
     };
+
+    // bytes needed to store one sample
+    this.sampleStorageBytes = null;
+
+    // how many bits at the end of the sample are zero pads
+    this.sampleZeroPadBits = null;
+
+    // the number of bytes in one sample frame
+    this.sampleFrameSize = null;
+
+    // where in the file is the first sampleframe
+    this.soundDataStart = null;
+
+    // how many samples to return when reading through the sound data
+    this.samplesPerRead = 8192;
+
+    // will contain n channel entries, each channel is an array of JS Number objects
+    // representing a sample point for that channel
+    // each channel contains samplesPerRead samples
+    this.samplesArray = [];
+
+    // to stream samples into client code, call it like this:
+    // for await(let samplesArray of aiff.samples) {
+    //  chanelsArray with have n entries (1 per channel)
+    //  each channel is an array samplePerRead long, each entry being a Number representing a sample value
+    //  every iteration yeilds the next samplePerRead samples
+    // }
+    // https://javascript.info/async-iterators-generators
+    const _this = this;
+    this.samples = {
+      [Symbol.asyncIterator]() {
+        let nextSampleFrameStart = 0;
+        const { numSampleFrames } = _this.chunks.COMM;
+
+        return {
+          async next() {
+            if (nextSampleFrameStart >= numSampleFrames) {
+              return { done: true }
+            }
+
+            const sampleFramesToRead = (_this.samplesPerRead <= numSampleFrames) ? _this.samplesPerRead : numSampleFrames - nextSampleFrameStart;
+
+            await _this.readSampleFrames({
+              sampleFrameStart: nextSampleFrameStart,
+              sampleFramesToRead,
+            });
+
+            nextSampleFrameStart = nextSampleFrameStart + sampleFramesToRead;
+
+            // TODO: the value probably needs to be an object telling the callee
+            // how many samples or frames were read, since samplesArray is always
+            // a fixed size and maybe be zero padded at the end
+            return { done: false, value: _this.samplesArray }
+          },
+        };
+      },
+    };
   }
 
   async open() {
@@ -72,6 +129,24 @@ class Aiff {
 
       eof = nextChunkStart >= fileSize;
     };
+
+    if (!this.chunks.COMM.start) {
+      throw new Error('File does not have COMM Chunk');
+    }
+
+    if (!this.chunks.SSND.start) {
+      throw new Error('File does not have SSND Chunk');
+    }
+
+    // setup the channels and sample arrays for streaming
+    for (let i = 0; i < this.chunks.COMM.numChannels; i++) {
+      this.samplesArray.push(Array(this.samplesPerRead));
+
+      // zero the array:
+      for (let j = 0; j < this.samplesPerRead; j++) {
+        this.samplesArray[i][j] = 0;
+      }
+    }
   }
 
   async readNextChunkHeader(nextChunkStart) {
@@ -118,6 +193,15 @@ class Aiff {
       COMM.sampleRate = Float80.fromBytes(
         buffer.slice(16, 26),
       ).asNumber().toNumber();
+
+      // how many bytes are needed to store one sample?
+      this.sampleStorageBytes = Math.ceil(COMM.sampleSize / 8);
+
+      // how many bits are at the end of the sample that are zero pads?
+      this.sampleZeroPadBits = (this.sampleStorageBytes * 8) - COMM.sampleSize;
+
+      // how many bytes are in each sample frame?
+      this.sampleFrameSize = this.sampleStorageBytes * COMM.numChannels;
     });
   }
 
@@ -138,6 +222,67 @@ class Aiff {
 
       if (SSND.blockSize !== 0) {
         throw new Error('Cannot read AIFFs with non-zero blockSize');
+      }
+
+      // at which byte index the sound data starts in the file:
+      this.soundDataStart = SSND.start + 16;
+    });
+  }
+
+  // sampleFrameStart: which sample frame to start reading from?
+  // sampleFramesToRead: how many sample frames should we read?
+  async readSampleFrames({ sampleFrameStart, sampleFramesToRead }) {
+    // at which byte in the file do we start reading?
+    const start = this.soundDataStart + (sampleFrameStart * this.sampleFrameSize);
+
+    // how many bytes do we read?
+    const length = (sampleFramesToRead * this.sampleFrameSize);
+
+    return this.fileBuffer.read({ start, length }).then((data) => {
+      const { buffer, bytesRead } = data;
+
+      // we should never be asked to read more data than exists in the file
+      if (bytesRead !== length) {
+        throw new Error('cannot request sampleFrames past end of file');
+      }
+
+      if (bytesRead % this.sampleFrameSize !== 0) {
+        throw new Error('bytesRead is not a multiple of sampleFrameSize');
+      }
+
+      // how many sample frames were actually returned?
+      const sampleFramesRead = bytesRead / this.sampleFrameSize;
+
+      // loop the sample frames:
+      for (let i = 0; i < sampleFramesRead; i++) {
+        // where does the frame start within the buffer
+        const frameStart = i * this.sampleFrameSize;
+
+        // loop each channel
+        for (let j = 0; j < this.chunks.COMM.numChannels; j++) {
+          // where does this channel start within the buffer?
+          const channelStart = frameStart + (j * this.sampleStorageBytes);
+
+          // get one sample for this channel
+          const samplePointBytes = buffer.slice(
+            channelStart,
+            channelStart + this.sampleStorageBytes,
+          );
+
+          // use a new byte buffer to leverage reading JS Numbers, we can only read 8, 16, 32 bits
+          // and AIFFs can only contain samples of bitdepth 1-32 bits
+          // lets always pad it out to 4 bytes long so we always read a 32 bit number
+          const sampleBuffer = Buffer.concat([
+            samplePointBytes,
+            Buffer.alloc(4 - this.sampleStorageBytes),
+          ]);
+
+          const paddingBits = this.sampleZeroPadBits + ((4 - this.sampleStorageBytes) * 8);
+          const sample = sampleBuffer.readInt32BE();
+
+          // bit shift in JS:
+          this.samplesArray[j][i] = sample / Math.pow(2, paddingBits);
+        }
       }
     });
   }
