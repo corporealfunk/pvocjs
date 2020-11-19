@@ -39,15 +39,10 @@ class Aiff {
     this.soundDataStart = null;
 
     // how many samples to return when reading through the sound data
-    this.samplesPerRead = 8192;
-
-    // will contain n channel entries, each channel is an array of JS Number objects
-    // representing a sample point for that channel
-    // each channel contains samplesPerRead samples
-    this.samplesArray = [];
+    this.samplesPerRead = 1000;
 
     // to stream samples into client code, call it like this:
-    // for await(let samplesArray of aiff.samples) {
+    // for await (let samplesByChannel of aiff.samples) {
     //  chanelsArray with have n entries (1 per channel)
     //  each channel is an array samplePerRead long, each entry being a Number representing a sample value
     //  every iteration yeilds the next samplePerRead samples
@@ -62,22 +57,20 @@ class Aiff {
         return {
           async next() {
             if (nextSampleFrameStart >= numSampleFrames) {
-              return { done: true }
+              return { done: true };
             }
 
-            const sampleFramesToRead = (_this.samplesPerRead <= numSampleFrames) ? _this.samplesPerRead : numSampleFrames - nextSampleFrameStart;
+            const sampleFramesRemaining = numSampleFrames - nextSampleFrameStart;
+            const sampleFramesToRead = (_this.samplesPerRead <= sampleFramesRemaining) ? _this.samplesPerRead : numSampleFrames - nextSampleFrameStart;
 
-            await _this.readSampleFrames({
+            const samplesByChannel = await _this.readSampleFrames({
               sampleFrameStart: nextSampleFrameStart,
               sampleFramesToRead,
             });
 
             nextSampleFrameStart = nextSampleFrameStart + sampleFramesToRead;
 
-            // TODO: the value probably needs to be an object telling the callee
-            // how many samples or frames were read, since samplesArray is always
-            // a fixed size and maybe be zero padded at the end
-            return { done: false, value: _this.samplesArray }
+            return { done: false, value: samplesByChannel };
           },
         };
       },
@@ -133,16 +126,6 @@ class Aiff {
     if (!this.chunks.SSND.start) {
       throw new Error('File does not have SSND Chunk');
     }
-
-    // setup the channels and sample arrays for streaming
-    for (let i = 0; i < this.chunks.COMM.numChannels; i++) {
-      this.samplesArray.push(Array(this.samplesPerRead));
-
-      // zero the array:
-      for (let j = 0; j < this.samplesPerRead; j++) {
-        this.samplesArray[i][j] = 0;
-      }
-    }
   }
 
   async readNextChunkHeader(nextChunkStart) {
@@ -150,11 +133,10 @@ class Aiff {
       start: nextChunkStart,
       length: 8,
     }).then((data) => {
-      const { buffer, eof } = data;
+      const { buffer } = data;
       return {
         chunkId: buffer.toString('latin1', 0, 4),
         size: buffer.readInt32BE(4),
-        eof,
       };
     });
   }
@@ -237,6 +219,13 @@ class Aiff {
     return this.fileBuffer.read({ start, length }).then((data) => {
       const { buffer, bytesRead } = data;
 
+      // create an array with a subarray to hold samples for each channel
+      const samplesByChannel = [];
+
+      for (let i = 0; i < this.chunks.COMM.numChannels; i++) {
+        samplesByChannel.push([]);
+      }
+
       // we should never be asked to read more data than exists in the file
       if (bytesRead !== length) {
         throw new Error('cannot request sampleFrames past end of file');
@@ -277,9 +266,11 @@ class Aiff {
           const sample = sampleBuffer.readInt32BE();
 
           // bit shift in JS:
-          this.samplesArray[j][i] = sample / Math.pow(2, paddingBits);
+          samplesByChannel[j][i] = sample / Math.pow(2, paddingBits);
         }
       }
+
+      return samplesByChannel;
     });
   }
 
