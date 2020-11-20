@@ -4,11 +4,11 @@ class Pvoc {
     overlap,        // overlap factor: 4,2,1,0.5
     scaleFactor,    // time scale factor
   }) {
-    if (![8192,4096,2048,1024,512,256,128,64,32,16].includes(points)) {
+    if (![8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16].includes(points)) {
       throw new Error('points must be a power of two between 16-8192');
     }
 
-    if (![.5, 1, 2, 4].includes(overlap)) {
+    if (![0.5, 1, 2, 4].includes(overlap)) {
       throw new Error('overlap must be one of: .5, 1, 2, 4');
     }
 
@@ -47,6 +47,13 @@ class Pvoc {
 
     if (scaleFactor > 1.0) {
       interpolation = maxRate;
+      // starting from the max interpolation rate, keep subtracting one
+      // and then calculate what the decimation rate is based on the desired
+      // scale. If the ratio between the two is within 1% of our desired scale,
+      // then we're done, use that. If we get down to a point where interpolation
+      // is === 1, then just set it back to maxRate and do a straight calculation
+      // of decimation (ie: we couldn't find an interpolation rate that resulted
+      // in the decimation rate being within 1% of desired)
       for (interpolation; percentError > 1.01; interpolation--) {
         decimation = Math.floor(interpolation / scaleFactor);
         const tempScaleFactor = interpolation / decimation;
@@ -61,7 +68,7 @@ class Pvoc {
           break;
         }
 
-        if (interpolation == 1) {
+        if (interpolation === 1) {
           interpolation = maxRate;
           decimation = Math.floor(interpolation / scaleFactor);
           break;
@@ -83,7 +90,7 @@ class Pvoc {
           break;
         }
 
-        if (decimation == 1) {
+        if (decimation === 1) {
           decimation = maxRate;
           interpolation = Math.floor(decimation * scaleFactor);
           break;
