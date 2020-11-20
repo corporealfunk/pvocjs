@@ -43,17 +43,28 @@ describe('#open', () => {
 });
 
 const bits16 = './test/aiffs/mono_441k_16b_sine.aif';
+const bits24 = './test/aiffs/mono_48k_24b_sine.aif';
 
 describe("#samples", () => {
-  const aiff = new Aiff(bits16);
+  describe('AIFF', () => {
+    test('iterates samples 16b', () => {
+      const aiff = new Aiff(bits16);
+      const channel1 = [];
+      return aiff.open().then(async () => {
+        for await (let samplesArray of aiff.samples) {
+          channel1.push(...samplesArray[0]);
+        }
+      });
+    });
 
-  test('iterates samples', () => {
-    const channel1 = [];
-    return aiff.open().then(async () => {
-      for await (let samplesArray of aiff.samples) {
-        channel1.push(...samplesArray[0]);
-      }
-      console.log(channel1.join(','));
+    test('iterates samples 24b', () => {
+      const aiff = new Aiff(bits24);
+      const channel1 = [];
+      return aiff.open().then(async () => {
+        for await (let samplesArray of aiff.samples) {
+          channel1.push(...samplesArray[0]);
+        }
+      });
     });
   });
 });
