@@ -25,7 +25,7 @@ const getHamming = memoize((size) => getIngWindow(size, 0.54));
 // SoundHack Math.c:56
 const getVonHann = memoize((size) => getIngWindow(size, 0.5));
 
-const getKaiser = (size) => {
+const getKaiser = memoize((size) => {
   if (size % 2 !== 0) {
     throw new Error('Kaiser window must be an even size');
   }
@@ -50,9 +50,9 @@ const getKaiser = (size) => {
   kaiserWindow[size - 1] = 0;
 
   return kaiserWindow;
-};
+});
 
-const getRamp = (size) => {
+const getRamp = memoize((size) => {
   const rampWindow = Array(size);
 
   for (let i = 0; i < size; i++) {
@@ -60,9 +60,9 @@ const getRamp = (size) => {
   }
 
   return rampWindow;
-};
+});
 
-const getRectangle = (size) => {
+const getRectangle = memoize((size) => {
   const rectangleWindow = Array(size);
 
   for (let i = 0; i < size; i++) {
@@ -70,9 +70,9 @@ const getRectangle = (size) => {
   }
 
   return rectangleWindow;
-};
+});
 
-const getSinc = (size) => {
+const getSinc = memoize((size) => {
   const sincWindow = Array(size);
   const halfSize = size / 2;
 
@@ -88,9 +88,9 @@ const getSinc = (size) => {
   }
 
   return sincWindow;
-};
+});
 
-const getTriangle = (size) => {
+const getTriangle = memoize((size) => {
   if (size % 2 !== 0) {
     throw new Error('Triangle window must be an even size');
   }
@@ -107,7 +107,7 @@ const getTriangle = (size) => {
   triangleWindow[halfSize] = 1;
 
   return triangleWindow;
-};
+});
 
 export {
   getHamming,
