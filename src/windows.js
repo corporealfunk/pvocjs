@@ -109,6 +109,85 @@ const getTriangle = memoize((size) => {
   return triangleWindow;
 });
 
+/*
+ * analysisWindow: array of the analysis window to scale
+ * synthesisWindow: array of the synthesis window to scale
+ * windowSize: the windowSize of the FFT to be performed
+ * points: the number of FFT bands we are going to compute
+ * interpolation: synthesis rate
+ *
+ * this code is from SoundHack/PhaseVocoderRoutines.c:15
+ */
+const scaleWindows = ({
+  analysisWindow,
+  synthesisWindow,
+  windowSize,
+  points,
+  interpolation,
+}) => {
+  const scaledAnalysisWindow = [...analysisWindow];
+  const scaledSynthesisWindow = [...synthesisWindow];
+
+  // scaling, note from original code:
+  /* when windowSize > points, also apply sin(x)/x windows to
+     ensure that window are 0 at increments of points (the FFT length)
+     away from the center of the analysis window and of interpolation
+     away from the center of the synthesis window
+  */
+  if (windowSize > points) {
+    let halfWindowSize = -(windowSize - 1) / 2;
+
+    for (let i = 0; i < windowSize; i++, halfWindowSize += 1.0) {
+      if (halfWindowSize !== 0.0) {
+        scaledAnalysisWindow[i] = (analysisWindow[i]
+        * points
+        * Math.sin((Math.PI * halfWindowSize) / points)) / (Math.PI * halfWindowSize);
+
+        scaledSynthesisWindow[i] = (synthesisWindow[i]
+        * interpolation
+        * Math.sin((Math.PI * halfWindowSize) / interpolation)) / (Math.PI * halfWindowSize);
+      }
+    }
+  }
+
+  // normalizing, note from original code:
+  //
+  /* normalize windows for unity gain across unmodified
+   * analysis-synthesis procedure
+   */
+  const analysisSum = scaledAnalysisWindow.reduce((memo, val) => memo + val, 0);
+  const analysisFactor = 2.0 / analysisSum;
+
+  // NOTE: we are ignoring the analysisType === CSOUND code branch
+  // in the original SoundHack code, I do not think analysisType is
+  // even set in the Pvoc routines in Soundhack
+  const synthesisFactor = windowSize > points ? 1 / analysisFactor : analysisFactor;
+
+  for (let i = 0; i < windowSize; i++) {
+    scaledAnalysisWindow[i] *= analysisFactor;
+    scaledSynthesisWindow[i] *= synthesisFactor;
+  }
+
+  if (windowSize <= points) {
+    let synthesisSum = 0;
+
+    for (let i = 0; i < windowSize; i += interpolation) {
+      synthesisSum += scaledSynthesisWindow[i] * scaledSynthesisWindow[i];
+    }
+
+    const amplitudeFactor = 1 / synthesisSum;
+
+    for (let i = 0; i < windowSize; i++) {
+      scaledSynthesisWindow[i] *= amplitudeFactor;
+    }
+  }
+
+  return {
+    scaledAnalysisWindow,
+    scaledSynthesisWindow,
+  };
+};
+
 export {
   getHamming,
   getVonHann,
@@ -117,4 +196,5 @@ export {
   getRectangle,
   getSinc,
   getTriangle,
+  scaleWindows,
 };

@@ -6,7 +6,10 @@ import {
   getRectangle,
   getSinc,
   getTriangle,
+  scaleWindows,
 } from './windows';
+
+import Pvoc from './pvoc';
 
 describe('#getHamming', () => {
   test('returns correct hamming window', () => {
@@ -139,5 +142,107 @@ describe('#getTriangle', () => {
       0.2,
       0
     ]);
+  });
+});
+
+describe('#scaleWindows', () => {
+  describe('when windowSize > points', () => {
+    test('returns correct scaled window', () => {
+      const pvoc = new Pvoc({
+        points: 16,
+        overlap: 2,
+        scaleFactor: 2,
+      });
+
+      const rectangleWindow = getRectangle(pvoc.windowSize);
+
+      const { scaledAnalysisWindow, scaledSynthesisWindow } = scaleWindows({
+        analysisWindow: rectangleWindow,
+        synthesisWindow: rectangleWindow,
+        windowSize: pvoc.windowSize,
+        points: pvoc.points,
+        interpolation: pvoc.interpolation,
+      });
+
+      expect(scaledSynthesisWindow).toEqual([
+        -0.29657487667347526,  -0.7653740612155567,
+        -0.8220684361204125,  -0.3677528470751085,
+        0.3997313555164231,   1.0569451321548162,
+        1.1682025144869022,   0.5408130104045715,
+        -0.6129214117918486,  -1.7073729057885492,
+        -2.017804343204649,  -1.0215356863197456,
+        1.3134030252682452,    4.439169555050229,
+        7.398615925083715,    9.193821176877712,
+        9.193821176877712,    7.398615925083715,
+        4.439169555050229,   1.3134030252682452,
+        -1.0215356863197456,   -2.017804343204649,
+        -1.7073729057885492,  -0.6129214117918486,
+        0.5408130104045715,   1.1682025144869022,
+        1.0569451321548162,   0.3997313555164231,
+        -0.3677528470751085,  -0.8220684361204125,
+        -0.7653740612155567, -0.29657487667347526
+      ]);
+
+      expect(scaledAnalysisWindow).toEqual([
+        0.0034136906457985826,  0.010807119218249003,
+        0.01884979519421818,  0.027396961303457375,
+        0.03628618906376107,   0.04534133965400855,
+        0.054376980507522175,   0.06320313329992723,
+        0.07163021773991754,   0.07947404843407085,
+        0.08656073933947088,   0.09273137205183381,
+        0.09784629036949063,    0.1017888940487781,
+        0.10446881910974033,    0.1058244100197558,
+        0.1058244100197558,   0.10446881910974033,
+        0.1017888940487781,   0.09784629036949063,
+        0.09273137205183381,   0.08656073933947088,
+        0.07947404843407085,   0.07163021773991754,
+        0.06320313329992723,  0.054376980507522175,
+        0.04534133965400855,   0.03628618906376107,
+        0.027396961303457375,   0.01884979519421818,
+        0.010807119218249003, 0.0034136906457985826
+      ]);
+    });
+  });
+
+  describe('when windowSize < points', () => {
+    test('returns correct scaled window', () => {
+      const pvoc = new Pvoc({
+        points: 16,
+        overlap: .5,
+        scaleFactor: 2,
+      });
+
+      const rectangleWindow = getRectangle(pvoc.windowSize);
+
+      const { scaledAnalysisWindow, scaledSynthesisWindow } = scaleWindows({
+        analysisWindow: rectangleWindow,
+        synthesisWindow: rectangleWindow,
+        windowSize: pvoc.windowSize,
+        points: pvoc.points,
+        interpolation: pvoc.interpolation,
+      });
+
+      expect(scaledSynthesisWindow).toEqual([
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+      ]);
+
+      expect(scaledAnalysisWindow).toEqual([
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+      ]);
+    });
   });
 });
