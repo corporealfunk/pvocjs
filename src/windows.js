@@ -1,37 +1,36 @@
+/* eslint no-plusplus: 0 */
+/* eslint no-restricted-properties: 0 */
+
 import memoize from 'fast-memoize';
 import bessel from 'bessel';
 
 const twoPi = 8.0 * Math.atan(1.0);
 
 // helper for hamm/hann windows
-const ingWindow = (size, a) => {
+const getIngWindow = (size, a) => {
   const b = 1.0 - a;
 
-  const ingWindow = Array(size)
+  const ingWindow = Array(size);
 
   for (let i = 0; i < size; i++) {
-    ingWindow[i] = a - b * Math.cos(twoPi * i / (size - 1));
+    ingWindow[i] = a - b * Math.cos((twoPi * i) / (size - 1));
   }
 
   return ingWindow;
 };
 
-const getHamming = memoize((size) => {
-  return ingWindow(size, 0.54);
-});
+const getHamming = memoize((size) => getIngWindow(size, 0.54));
 
 // this is a more standard hann window and differs from that found in
 // SoundHack Math.c:56
-const getVonHann = memoize((size) => {
-  return ingWindow(size, 0.5);
-});
+const getVonHann = memoize((size) => getIngWindow(size, 0.5));
 
 const getKaiser = (size) => {
   if (size % 2 !== 0) {
     throw new Error('Kaiser window must be an even size');
   }
 
-  const kaiserWindow = Array(size)
+  const kaiserWindow = Array(size);
 
   const a = 2.1645; // SoundHack value
   const param = Math.PI * a;
@@ -41,7 +40,7 @@ const getKaiser = (size) => {
 
   for (let i = 0; i < halfSize; i++) {
     const value = param * Math.sqrt(
-      1 - Math.pow(((2 * i)/size), 2),
+      1 - Math.pow(((2 * i) / size), 2),
     );
 
     kaiserWindow[i + halfSize] = bessel.besseli(value, 0) / paramBessel;
@@ -51,27 +50,27 @@ const getKaiser = (size) => {
   kaiserWindow[size - 1] = 0;
 
   return kaiserWindow;
-}
+};
 
 const getRamp = (size) => {
-  const rampWindow = Array(size)
+  const rampWindow = Array(size);
 
   for (let i = 0; i < size; i++) {
-    rampWindow[i] = 1 - (i/size);
+    rampWindow[i] = 1 - (i / size);
   }
 
   return rampWindow;
-}
+};
 
 const getRectangle = (size) => {
-  const rectangleWindow = Array(size)
+  const rectangleWindow = Array(size);
 
   for (let i = 0; i < size; i++) {
     rectangleWindow[i] = 1;
   }
 
   return rectangleWindow;
-}
+};
 
 const getSinc = (size) => {
   const sincWindow = Array(size);
@@ -81,15 +80,15 @@ const getSinc = (size) => {
     if (i === halfSize) {
       sincWindow[i] = 1;
     } else {
-      const a = Math.PI * (i - halfSize) / halfSize;
+      const a = Math.PI * ((i - halfSize) / halfSize);
       const b = 2 * Math.PI * (i - halfSize);
 
-      sincWindow[i] = size * Math.sin(a) / b;
+      sincWindow[i] = (size * Math.sin(a)) / b;
     }
   }
 
   return sincWindow;
-}
+};
 
 const getTriangle = (size) => {
   if (size % 2 !== 0) {
@@ -108,7 +107,7 @@ const getTriangle = (size) => {
   triangleWindow[halfSize] = 1;
 
   return triangleWindow;
-}
+};
 
 export {
   getHamming,
@@ -118,4 +117,4 @@ export {
   getRectangle,
   getSinc,
   getTriangle,
-}
+};
