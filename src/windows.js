@@ -7,7 +7,7 @@ const twoPi = 8.0 * Math.atan(1.0);
 const ingWindow = (size, a) => {
   const b = 1.0 - a;
 
-  const ingWindow = [];
+  const ingWindow = Array(size)
 
   for (let i = 0; i < size; i++) {
     ingWindow[i] = a - b * Math.cos(twoPi * i / (size - 1));
@@ -31,7 +31,7 @@ const getKaiser = (size) => {
     throw new Error('Kaiser window must be an even size');
   }
 
-  const kaiserWindow = [];
+  const kaiserWindow = Array(size)
 
   const a = 2.1645; // SoundHack value
   const param = Math.PI * a;
@@ -54,15 +54,60 @@ const getKaiser = (size) => {
 }
 
 const getRamp = (size) => {
+  const rampWindow = Array(size)
+
+  for (let i = 0; i < size; i++) {
+    rampWindow[i] = 1 - (i/size);
+  }
+
+  return rampWindow;
 }
 
 const getRectangle = (size) => {
+  const rectangleWindow = Array(size)
+
+  for (let i = 0; i < size; i++) {
+    rectangleWindow[i] = 1;
+  }
+
+  return rectangleWindow;
 }
 
 const getSinc = (size) => {
+  const sincWindow = Array(size);
+  const halfSize = size / 2;
+
+  for (let i = 0; i < size; i++) {
+    if (i === halfSize) {
+      sincWindow[i] = 1;
+    } else {
+      const a = Math.PI * (i - halfSize) / halfSize;
+      const b = 2 * Math.PI * (i - halfSize);
+
+      sincWindow[i] = size * Math.sin(a) / b;
+    }
+  }
+
+  return sincWindow;
 }
 
 const getTriangle = (size) => {
+  if (size % 2 !== 0) {
+    throw new Error('Triangle window must be an even size');
+  }
+
+  const triangleWindow = Array(size);
+
+  const halfSize = size / 2;
+
+  for (let i = 0; i < halfSize; i++) {
+    triangleWindow[i] = i / halfSize;
+    triangleWindow[size - i] = triangleWindow[i];
+  }
+
+  triangleWindow[halfSize] = 1;
+
+  return triangleWindow;
 }
 
 export {
