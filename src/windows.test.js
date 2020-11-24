@@ -1,6 +1,7 @@
 import {
   getHamming,
   getVonHann,
+  getKaiser,
 } from './windows';
 
 describe('#getHamming', () => {
@@ -36,6 +37,25 @@ describe('#getVonHann', () => {
       0.7500000000000002,
       0.413175911166535,
       0.1169777784405111,
+      0
+    ]);
+  });
+});
+
+describe('#getKaiser', () => {
+  test('returns correct kaiser window', () => {
+    const kaiserWindow = getKaiser(10);
+
+    expect(kaiserWindow).toEqual([
+      0,
+      0.08642921347855281,
+      0.2885948752723749,
+      0.5932877479138193,
+      0.8809748997589503,
+      1,
+      0.8809748997589503,
+      0.5932877479138193,
+      0.2885948752723749,
       0
     ]);
   });
