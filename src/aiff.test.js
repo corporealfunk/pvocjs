@@ -68,3 +68,19 @@ describe("#samples", () => {
     });
   });
 });
+
+describe("#samplesIterator", () => {
+  describe('AIFF', () => {
+    test('iterates samples 16b', () => {
+      const aiff = new Aiff(bits16);
+      const channel1 = [];
+      return aiff.open().then(async () => {
+        const it = aiff.samplesIterator(512);
+
+        for await (let samplesArray of it) {
+          channel1.push(...samplesArray[0]);
+        }
+      });
+    });
+  });
+});

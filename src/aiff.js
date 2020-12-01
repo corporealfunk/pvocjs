@@ -274,6 +274,28 @@ class Aiff {
     });
   }
 
+  // return an iterator that will grab <size> samples at a time
+  // if size is undefined, the iterator will grab all data on first read
+  // yields array of channels which will contain up to <size> samples
+  *samplesIterator(size) {
+    let nextSampleFrameStart = 0;
+    const { numSampleFrames } = this.chunks.COMM;
+
+    let sampleFramesRemaining = numSampleFrames - nextSampleFrameStart;
+
+    while (sampleFramesRemaining > 0) {
+      const sampleFramesToRead = (size <= sampleFramesRemaining) ? size : numSampleFrames - nextSampleFrameStart;
+
+      yield this.readSampleFrames({
+        sampleFrameStart: nextSampleFrameStart,
+        sampleFramesToRead,
+      });
+
+      nextSampleFrameStart = nextSampleFrameStart + sampleFramesToRead;
+      sampleFramesRemaining = numSampleFrames - nextSampleFrameStart;
+    }
+  }
+
   async close() {
     return this.fileBuffer.close();
   }
