@@ -1,3 +1,10 @@
+import {
+  getHamming,
+  scaleWindows,
+} from './windows';
+
+import SlidingBuffer from './sliding_buffer';
+
 class Pvoc {
   constructor({
     points,         // number of FFT bins/bands
@@ -105,6 +112,95 @@ class Pvoc {
       interpolation,
       newScaleFactor,
     };
+  }
+
+  async run(inputSoundData) {
+    const {
+      scaledAnalysisWindow,
+      scaledSynthesisWindow,
+    } = scaleWindows({
+      analysisWindow: getHamming(this.windowSize),
+      synthesisWindow: getHamming(this.windowSize),
+      windowSize: this.windowSize,
+      points: this.points,
+      interpolation: this.interpolation,
+    });
+
+    // where we are in the input/output in samples
+    let inPointer = -1 * this.windowSize;
+    let outPointer = (inPointer * this.interpolation) / this.decimation;
+    let inPosition = 0;
+
+    // only do mono right now:
+    const inputBuffer = new SlidingBuffer(this.windowSize);
+
+    // every time we ge samples we need the decimation length:
+    const samplesIterator = inputSoundData.samplesIterator(this.decimation);
+
+    // loop:
+    let eof = false;
+    while (!eof) {
+      inPointer += this.decimation;
+      outPointer += this.interpolation;
+
+      // shift into the input buffer samples from the audio file:
+      const { done, value } = samplesIterator.next();
+
+      if (!done) {
+        // index 0 is 1st channel's samples
+        const channel = value[0];
+
+        // pad with 0's to match decimation length if needed:
+        for (let i = 0; i < this.decimation - channel.length; i++) {
+          channel.push(0);
+        }
+
+        inputBuffer.shiftIn(channel);
+
+        // window fold:
+        const spectrum = this.windowFold({
+          inputSamples: inputBuffer.buffer,
+          analysisWindow: scaledAnalysisWindow,
+          currentTime: inPointer,
+          points: this.points,
+          windowSize: this.windowSize,
+        });
+      }
+      eof = done;
+    }
+  }
+
+  windowFold({
+    inputSamples,
+    analysisWindow,
+    currentTime,
+    points,
+    windowSize,
+  }) {
+    const output = Array(points);
+
+    for (let i = 0; i < points; i++) {
+      output[i] = 0;
+    }
+
+    let timeIndex = currentTime;
+
+    while (timeIndex < 0) {
+      timeIndex += points;
+    }
+
+    timeIndex %= points;
+
+    for (let i = 0; i < windowSize; i++) {
+      output[timeIndex] += inputSamples[i] * analysisWindow[i];
+
+      timeIndex++;
+      if (timeIndex === points) {
+        timeIndex = 0;
+      }
+    }
+
+    return output;
   }
 }
 
