@@ -17,7 +17,7 @@ const initFFTTable = () => {
     gOmegaPiReal[i] = -2.0 * Math.sin(Pi / N) * Math.sin(Pi / N);
 
     // JS bit shift: N = N << i:
-    N *= 2 ** i;
+    N *= 2 ** 1;
   }
 };
 
