@@ -1,6 +1,5 @@
 import {
-  gOmegaPiImag,
-  gOmegaPiReal,
+  gOmegaPiTables,
   bitReverse,
 } from './fft';
 
@@ -8,7 +7,7 @@ import {
 
 describe("gOmegaPiReal", () => {
   test('contains table', () => {
-    expect(gOmegaPiReal).toEqual([
+    expect(gOmegaPiTables.real).toEqual([
       -2,
       -0.9999999999999998,
       -0.2928932188134525,
@@ -46,7 +45,7 @@ describe("gOmegaPiReal", () => {
 
 describe("gOmegaPiImag", () => {
   test('contains table', () => {
-    expect(gOmegaPiImag).toEqual([
+    expect(gOmegaPiTables.imag).toEqual([
       1.2246467991473532e-16,
       1,
       0.7071067811865475,

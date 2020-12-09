@@ -2,8 +2,10 @@
 const FFT_TIME2FREQ = 1;
 const FFT_FREQ2TIME = 2;
 
-const gOmegaPiImag = [];
-const gOmegaPiReal = [];
+const gOmegaPiTables = {
+  imag: [],
+  real: [],
+};
 
 const Pi = 4.0 * Math.atan(1.0);
 const TwoPi = 8.0 * Math.atan(1.0);
@@ -13,8 +15,8 @@ const initFFTTable = () => {
   let N = 2;
 
   for (let i = 0; i < 31; i++) {
-    gOmegaPiImag[i] = Math.sin(TwoPi / N);
-    gOmegaPiReal[i] = -2.0 * Math.sin(Pi / N) * Math.sin(Pi / N);
+    gOmegaPiTables.imag[i] = Math.sin(TwoPi / N);
+    gOmegaPiTables.real[i] = -2.0 * Math.sin(Pi / N) * Math.sin(Pi / N);
 
     // JS bit shift: N = N << i:
     N *= 2 ** 1;
@@ -61,8 +63,9 @@ const FFT = ({ inputSpectrum, halfPoints, direction }) => {
   for (let nMax = 2; nMax < halfPoints; nMax = twoMMax) {
     twoMMax = nMax * 2;
 
-    const omegaPiReal = gOmegaPiReal[n];
-    const omegaPiImag = direction === FFT_TIME2FREQ ? gOmegaPiImag[n] : -gOmegaPiImag[n];
+    const omegaPiReal = gOmegaPiTables.real[n];
+    const omegaPiImag = (direction === FFT_TIME2FREQ)
+      ? gOmegaPiTables.imag[n] : -gOmegaPiTables.imag[n];
     n++;
     let omegaReal = 1;
     let omegaImag = 0;
@@ -96,6 +99,10 @@ const FFT = ({ inputSpectrum, halfPoints, direction }) => {
 const RealFFT = ({ inputSpectrum, halfPoints, direction }) => {
   const data = inputSpectrum;
   let twoPiOmmax = Pi / halfPoints;
+
+  let omegaReal = 1.0;
+  let omegaImag = 0;
+
   const c1 = 0.5;
 
   let c2;
@@ -112,12 +119,54 @@ const RealFFT = ({ inputSpectrum, halfPoints, direction }) => {
     xi = 0;
     data[1] = 0;
   }
+
+  let temp = Math.sin(0.5 * twoPiOmmax);
+  const omegaPiReal = -2.0 * temp * temp;
+
+  // deal with sinf float force? normally in C sin returns a double?
+  const omegaPiImag = Math.sin(twoPiOmmax);
+  const N2p1 = (halfPoints * 2) + 1;
+
+  for (let i = 0; i <= halfPoints / 2; i++) {
+    const i1 = i * 2;
+    const i2 = i1 + 1;
+    const i3 = N2p1 - i2;
+    const i4 = i3 + 1;
+    if (i === 0) {
+      const h1r = c1 * (data[i1] + xr);
+      const h1i = c1 * (data[i2] - xi);
+      const h2r = -c2 * (data[i2] + xi);
+      const h2i = c2 * (data[i1] - xr);
+      data[i1] = h1r + omegaReal * h2r - omegaImag * h2i;
+      data[i2] = h1i + omegaReal * h2i + omegaImag * h2r;
+      xr = h1r - omegaReal * h2r + omegaImag * h2i;
+      xi = -h1i + omegaReal * h2i + omegaImag * h2r;
+    } else {
+      const h1r = c1 * (data[i1] + data[i3]);
+      const h1i = c1 * (data[i2] - data[i4]);
+      const h2r = -c2 * (data[i2] + data[i4]);
+      const h2i = c2 * (data[i1] - data[i3]);
+      data[i1] = h1r + omegaReal * h2r - omegaImag * h2i;
+      data[i2] = h1i + omegaReal * h2i + omegaImag * h2r;
+      data[i3] = h1r - omegaReal * h2r + omegaImag * h2i;
+      data[i4] = -h1i + omegaReal * h2i + omegaImag * h2r;
+    }
+    temp = omegaReal;
+    omegaReal = temp * omegaPiReal - omegaImag * omegaPiImag + omegaReal;
+    omegaImag = omegaImag * omegaPiReal + temp * omegaPiImag + omegaImag;
+  }
+
+  if (direction === FFT_TIME2FREQ) {
+    data[1] = xr;
+  } else {
+    FFT({ inputSpectrum, halfPoints, direction });
+  }
 };
 
 export {
   FFT_FREQ2TIME,
   FFT_TIME2FREQ,
-  gOmegaPiImag,
-  gOmegaPiReal,
+  gOmegaPiTables,
   bitReverse,
+  RealFFT,
 };
