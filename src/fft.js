@@ -25,6 +25,16 @@ const initFFTTable = () => {
 
 initFFTTable();
 
+const hypot = (x, y) => {
+  const z = x * x + y * y;
+
+  if (z === 0) {
+    return 0;
+  }
+
+  return Math.sqrt(z);
+};
+
 // rearranges data array in bit-reversal order in-place
 // NOTE: the data array contains data in pairs, so the
 // bitreversal operates on data pairs (element i and i + 1)
@@ -52,9 +62,8 @@ const bitReverse = (data) => {
   }
 };
 
-// computes FFT in-place on the inputSpectrum
-const FFT = ({ inputSpectrum, halfPoints, direction }) => {
-  const data = inputSpectrum;
+// computes FFT in-place on the data
+const FFT = ({ data, halfPoints, direction }) => {
   bitReverse(data);
 
   let twoMMax = 0;
@@ -96,8 +105,7 @@ const FFT = ({ inputSpectrum, halfPoints, direction }) => {
   }
 };
 
-const RealFFT = ({ inputSpectrum, halfPoints, direction }) => {
-  const data = inputSpectrum;
+const RealFFT = ({ data, halfPoints, direction }) => {
   let twoPiOmmax = Pi / halfPoints;
 
   let omegaReal = 1.0;
@@ -110,7 +118,7 @@ const RealFFT = ({ inputSpectrum, halfPoints, direction }) => {
   let xi;
   if (direction === FFT_TIME2FREQ) {
     c2 = -0.5;
-    FFT({ inputSpectrum, halfPoints, direction });
+    FFT({ data, halfPoints, direction });
     [xr, xi] = data;
   } else {
     c2 = 0.5;
@@ -159,8 +167,88 @@ const RealFFT = ({ inputSpectrum, halfPoints, direction }) => {
   if (direction === FFT_TIME2FREQ) {
     data[1] = xr;
   } else {
-    FFT({ inputSpectrum, halfPoints, direction });
+    FFT({ data, halfPoints, direction });
   }
+};
+
+const cartToPolar = ({ spectrum, halfPoints }) => {
+  const polarSpectrum = Array(spectrum.length + 2);
+
+  for (let i = 0; i < polarSpectrum.length; i++) {
+    polarSpectrum[i] = 0;
+  }
+
+  for (let i = 0; i <= halfPoints; i++) {
+    const realIndex = i * 2;
+    const ampIndex = realIndex;
+
+    const imagIndex = realIndex + 1;
+    const phaseIndex = imagIndex;
+
+    let realPart;
+    let imagPart;
+
+    if (i === 0) {
+      realPart = spectrum[realIndex];
+      imagPart = 0;
+    } else if (i === halfPoints) {
+      realPart = spectrum[1]; // eslint-disable-line prefer-destructuring
+      imagPart = 0;
+    } else {
+      realPart = spectrum[realIndex];
+      imagPart = spectrum[imagIndex];
+    }
+    polarSpectrum[ampIndex] = hypot(realPart, imagPart);
+    if (polarSpectrum[ampIndex] === 0) {
+      polarSpectrum[phaseIndex] = 0;
+    } else {
+      polarSpectrum[phaseIndex] = -Math.atan2(imagPart, realPart);
+    }
+  }
+
+  return polarSpectrum;
+};
+
+const polarToCart = ({ polarSpectrum, halfPoints }) => {
+  const spectrum = Array(halfPoints * 2);
+
+  for (let i = 0; i < spectrum.length; i++) {
+    spectrum[i] = 0;
+  }
+
+  for (let i = 0; i <= halfPoints; i++) {
+    let realIndex = i * 2;
+    const ampIndex = realIndex;
+
+    const imagIndex = realIndex + 1;
+    const phaseIndex = imagIndex;
+
+    let realValue;
+    let imagValue;
+
+    if (polarSpectrum[ampIndex] === 0) {
+      realValue = 0;
+      imagValue = 0;
+    } else if (i === 0 || i === halfPoints) {
+      realValue = polarSpectrum[ampIndex] * Math.cos(polarSpectrum[phaseIndex]);
+      imagValue = 0;
+    } else {
+      realValue = polarSpectrum[ampIndex] * Math.cos(polarSpectrum[phaseIndex]);
+      imagValue = -polarSpectrum[ampIndex] * Math.sin(polarSpectrum[phaseIndex]);
+    }
+
+    if (i === halfPoints) {
+      realIndex = 1;
+    }
+
+    spectrum[realIndex] = realValue;
+
+    if (i !== halfPoints && i !== 0) {
+      spectrum[imagIndex] = imagValue;
+    }
+  }
+
+  return spectrum;
 };
 
 export {
@@ -169,4 +257,6 @@ export {
   gOmegaPiTables,
   bitReverse,
   RealFFT,
+  cartToPolar,
+  polarToCart,
 };
