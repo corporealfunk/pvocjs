@@ -1,4 +1,6 @@
 /* eslint-disable no-param-reassign */
+import { zeroArray } from './utilties';
+
 const FFT_TIME2FREQ = 1;
 const FFT_FREQ2TIME = 2;
 
@@ -174,9 +176,7 @@ const RealFFT = ({ data, halfPoints, direction }) => {
 const cartToPolar = ({ spectrum, halfPoints }) => {
   const polarSpectrum = Array(spectrum.length + 2);
 
-  for (let i = 0; i < polarSpectrum.length; i++) {
-    polarSpectrum[i] = 0;
-  }
+  zeroArray(polarSpectrum);
 
   for (let i = 0; i <= halfPoints; i++) {
     const realIndex = i * 2;
@@ -251,6 +251,100 @@ const polarToCart = ({ polarSpectrum, halfPoints }) => {
   return spectrum;
 };
 
+// in-place spectral gate
+const simpleSpectralGate = ({
+  polarSpectrum,
+  maskRatio,
+  minAmplitude,
+  halfPoints,
+}) => {
+  let maxAmplitude = 0;
+
+  for (let i = 0; i <= halfPoints; i++) {
+    const ampIndex = i * 2;
+
+    if (polarSpectrum[ampIndex] > maxAmplitude) {
+      maxAmplitude = polarSpectrum[ampIndex];
+    }
+  }
+
+  const maskAmplitude = maskRatio * maxAmplitude;
+
+  for (let i = 0; i <= halfPoints; i++) {
+    const ampIndex = i * 2;
+
+    // duck to 0 if below maskAmplitude or minAmplitude
+    if (polarSpectrum[ampIndex] < maskAmplitude) {
+      polarSpectrum[ampIndex] = 0;
+    } else if (polarSpectrum[ampIndex] < minAmplitude) {
+      polarSpectrum[ampIndex] = 0;
+    }
+  }
+};
+
+const phaseInterpolate = ({
+  polarSpectrum,
+  halfPoints,
+  decimation,
+  scaleFactor,
+  phaseLocking,
+}) => {
+  const phasePerBand = (decimation * TwoPi) / (halfPoints * 2);
+
+  const lastPhaseIn = Array(halfPoints + 1);
+  const lastPhaseOut = Array(halfPoints + 1);
+
+  zeroArray(lastPhaseIn);
+  zeroArray(lastPhaseOut);
+
+  for (let i = 0; i <= halfPoints; i++) {
+    const ampIndex = i * 2;
+    const phaseIndex = ampIndex + 1;
+    let phaseDifference;
+
+    if (polarSpectrum[ampIndex] === 0) {
+      phaseDifference = 0;
+      polarSpectrum[phaseIndex] = lastPhaseOut[i];
+    } else {
+      if (phaseLocking) {
+        let maxAmplitude = 0;
+
+        if (i > 1) {
+          maxAmplitude = polarSpectrum[ampIndex - 2];
+          phaseDifference = (polarSpectrum[phaseIndex - 2] - lastPhaseIn[i - 1]) - phasePerBand;
+        }
+
+        if (polarSpectrum[ampIndex] > maxAmplitude) {
+          maxAmplitude = polarSpectrum[ampIndex];
+        }
+
+        if (i !== halfPoints) {
+          if (polarSpectrum[ampIndex + 2] > maxAmplitude) {
+            phaseDifference = (polarSpectrum[phaseIndex + 2] - lastPhaseIn[i + 1]) + phasePerBand;
+          }
+        }
+      } else {
+        phaseDifference = polarSpectrum[phaseIndex] - lastPhaseIn[i];
+      }
+
+      lastPhaseIn[i] = polarSpectrum[phaseIndex];
+
+      phaseDifference *= scaleFactor;
+      polarSpectrum[phaseIndex] = lastPhaseOut[i] + phaseDifference;
+
+      while (polarSpectrum[phaseIndex] > Pi) {
+        polarSpectrum[phaseIndex] -= TwoPi;
+      }
+
+      while (polarSpectrum[phaseIndex] < -Pi) {
+        polarSpectrum[phaseIndex] += TwoPi;
+      }
+
+      lastPhaseOut[i] = polarSpectrum[phaseIndex];
+    }
+  }
+};
+
 export {
   FFT_FREQ2TIME,
   FFT_TIME2FREQ,
@@ -259,4 +353,6 @@ export {
   RealFFT,
   cartToPolar,
   polarToCart,
+  simpleSpectralGate,
+  phaseInterpolate,
 };
