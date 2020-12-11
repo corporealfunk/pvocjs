@@ -77,8 +77,12 @@ class Aiff {
     };
   }
 
-  async open() {
-    return this.fileBuffer.open().then(() => this.parse());
+  async openForRead() {
+    return this.fileBuffer.openForRead().then(() => this.parse());
+  }
+
+  async openWrite() {
+    return this.fileBuffer.open();
   }
 
   // seek through file to find all chunks and populate
