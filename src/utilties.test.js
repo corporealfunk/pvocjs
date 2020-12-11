@@ -29,4 +29,10 @@ describe('floatToExtended', () => {
       floatToExtended(-55.0034598),
     )).toEqual(-55.0034598);
   });
+
+  it('converts a standard sample rate', () => {
+    expect(float80ToNumber(
+      floatToExtended(48000),
+    )).toEqual(48000);
+  });
 });
