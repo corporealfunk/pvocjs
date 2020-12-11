@@ -1,5 +1,6 @@
 import FileBuffer from './file_buffer';
 import { Float80 } from 'float80';
+import memoize from 'fast-memoize';
 
 class Aiff {
   constructor(filePath) {
@@ -25,18 +26,6 @@ class Aiff {
         blockSize: null,        // ulong:    4 bytes
       },
     };
-
-    // bytes needed to store one sample
-    this.sampleStorageBytes = null;
-
-    // how many bits at the end of the sample are zero pads
-    this.sampleZeroPadBits = null;
-
-    // the number of bytes in one sample frame
-    this.sampleFrameSize = null;
-
-    // where in the file is the first sampleframe
-    this.soundDataStart = null;
 
     // how many samples to return when reading through the sound data
     this.samplesPerRead = 1000;
@@ -77,12 +66,59 @@ class Aiff {
     };
   }
 
+  // how many bytes are needed to store one sample?
+  get sampleStorageBytes() {
+    const computation = memoize(sampleSize => Math.ceil(sampleSize / 8));
+    return computation(this.chunks.COMM.sampleSize);
+  }
+
+  // how many bits are at the end of the sample that are zero pads?
+  get sampleZeroPadBits() {
+    const computation = memoize((sampleStorageBytes, sampleSize) => (
+      (sampleStorageBytes * 8) - sampleSize
+    ));
+    return computation(this.sampleStorageBytes, this.chunks.COMM.sampleSize);
+  }
+
+  // how many bytes are in each sample frame?
+  get sampleFrameSize() {
+    const computation = memoize((sampleStorageBytes, numChannels) => sampleStorageBytes * numChannels);
+    return computation(this.sampleStorageBytes, this.chunks.COMM.numChannels);
+  }
+
+  // at which byte index the sound data starts in the file:
+  get soundDataStart() {
+    const computation = memoize(start => start + 16);
+    return computation(this.chunks.SSND.start);
+  }
+
   async openForRead() {
     return this.fileBuffer.openForRead().then(() => this.parse());
   }
 
-  async openWrite() {
-    return this.fileBuffer.open();
+  async openForWrite({
+    sampleRate,
+    bitDepth,
+    numChannels,
+  }) {
+    const {
+      COMM,
+      FORM,
+      SSND,
+    } = this.chunks;
+
+    FORM.size = 0;
+    FORM.formType = 'AIFF';
+
+    COMM.start = 12;
+    COMM.numChannels = numChannels;
+    COMM.numSampleFrames = 0;
+    COMM.sampleSize = bitDepth;
+    COMM.sampleRate = sampleRate;
+
+    SSND.start = 30;
+
+    return this.fileBuffer.openForWrite();
   }
 
   // seek through file to find all chunks and populate
@@ -175,15 +211,6 @@ class Aiff {
       COMM.sampleRate = Float80.fromBytes(
         buffer.slice(16, 26),
       ).asNumber().toNumber();
-
-      // how many bytes are needed to store one sample?
-      this.sampleStorageBytes = Math.ceil(COMM.sampleSize / 8);
-
-      // how many bits are at the end of the sample that are zero pads?
-      this.sampleZeroPadBits = (this.sampleStorageBytes * 8) - COMM.sampleSize;
-
-      // how many bytes are in each sample frame?
-      this.sampleFrameSize = this.sampleStorageBytes * COMM.numChannels;
     });
   }
 
@@ -205,9 +232,6 @@ class Aiff {
       if (SSND.blockSize !== 0) {
         throw new Error('Cannot read AIFFs with non-zero blockSize');
       }
-
-      // at which byte index the sound data starts in the file:
-      this.soundDataStart = SSND.start + 16;
     });
   }
 
