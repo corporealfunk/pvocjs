@@ -9,16 +9,22 @@ class SlidingBuffer {
     }
   }
 
+  // returns to you the data that got shifted out
   shiftIn(data) {
     if (data.length > this.size) {
       throw new Error('Cannot shiftIn more data than buffer size');
     }
 
+    const shiftedOut = this.buffer.slice(0, data.length);
+
     this.buffer = this.buffer.slice(data.length, this.buffer.length);
     this.buffer.push(...data);
+
+    return shiftedOut;
   }
 
   // shifts the contents to the left by length and pads with 0
+  // returns to you the shiftedOut data
   shiftLeft(length) {
     if (length > this.size) {
       throw new Error('Cannot shiftOver more than buffer size');
@@ -30,7 +36,7 @@ class SlidingBuffer {
       data[i] = 0;
     }
 
-    this.shiftIn(data);
+    return this.shiftIn(data);
   }
 }
 
