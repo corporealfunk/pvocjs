@@ -1,10 +1,32 @@
+/* eslint-disable no-param-reassign */
+/* eslint-disable class-methods-use-this */
+/* eslint-disable no-multi-spaces */
 import {
   getHamming,
   scaleWindows,
 } from './windows';
 
+import {
+  FFT_TIME2FREQ,
+  FFT_FREQ2TIME,
+  RealFFT,
+} from './fft';
+
+import {
+  zeroArray,
+} from './utilties';
+
+import {
+  cartToPolar,
+  polarToCart,
+  simpleSpectralGate,
+  phaseInterpolate,
+} from './spectral_processing';
+
 import SlidingBuffer from './sliding_buffer';
 
+// TODO: points is a bad variable name, see:
+// https://github.com/tomerbe/SoundHack/issues/2
 class Pvoc {
   constructor({
     points,         // number of FFT bins/bands
@@ -114,7 +136,7 @@ class Pvoc {
     };
   }
 
-  async run(inputSoundData) {
+  async run(inputSoundData, outputSoundData) {
     const {
       scaledAnalysisWindow,
       scaledSynthesisWindow,
@@ -129,10 +151,10 @@ class Pvoc {
     // where we are in the input/output in samples
     let inPointer = -1 * this.windowSize;
     let outPointer = (inPointer * this.interpolation) / this.decimation;
-    let inPosition = 0;
 
     // only do mono right now:
     const inputBuffer = new SlidingBuffer(this.windowSize);
+    const outputBuffer = new SlidingBuffer(this.windowSize);
 
     // every time we ge samples we need the decimation length:
     const samplesIterator = inputSoundData.samplesIterator(this.decimation);
@@ -158,14 +180,76 @@ class Pvoc {
         inputBuffer.shiftIn(channel);
 
         // window fold:
-        const spectrum = this.windowFold({
+        const foldedSamples = this.windowFold({
           inputSamples: inputBuffer.buffer,
           analysisWindow: scaledAnalysisWindow,
           currentTime: inPointer,
           points: this.points,
           windowSize: this.windowSize,
         });
+
+        // FFT in-place:
+        RealFFT({
+          data: foldedSamples,
+          halfPoints: this.halfPoints,
+          direction: FFT_TIME2FREQ,
+        });
+
+        // foldedSamples now contains the spectrum for each band:
+        const spectrum = foldedSamples;
+
+        // get a polar spectrum out of it:
+        const polarSpectrum = cartToPolar({
+          spectrum,
+          halfPoints: this.halfPoints,
+        });
+
+        // constrain amplitudes in place:
+        simpleSpectralGate({
+          polarSpectrum,
+          maskRatio: 0, // seems to always be 0 in SoundHack
+          minAmplitude: 0, // seems to always be 0 in SoundHack
+          halfPoints: this.halfPoints,
+        });
+
+        // phase interpolate in place:
+        phaseInterpolate({
+          polarSpectrum,
+          halfPoints: this.halfPoints,
+          decimation: this.decimation,
+          scaleFactor: this.scaleFactor,
+          phaseLocking: false, // seems to always be false in SoundHack
+        });
+
+        const cartSpectrum = polarToCart({
+          polarSpectrum,
+          halfPoints: this.halfPoints,
+        });
+
+        // spectrum to samples in place:
+        RealFFT({
+          spectrum: cartSpectrum,
+          halfPoints: this.halfPoints,
+          FFT_FREQ2TIME,
+        });
+
+        const fftResynth = cartSpectrum;
+
+        // overlap add into the contents of our buffer
+        this.overlapAdd({
+          inputSamples: fftResynth,
+          synthesisWindow: scaledSynthesisWindow,
+          outputBuffer: outputBuffer.buffer,
+          currentTime: outPointer,
+          points: this.points,
+          windowSize: this.windowSize,
+        });
+
+        outputSoundData.writeSamples(
+          [outputBuffer.shiftLeft(this.interpolation)],
+        );
       }
+
       eof = done;
     }
   }
@@ -178,10 +262,7 @@ class Pvoc {
     windowSize,
   }) {
     const output = Array(points);
-
-    for (let i = 0; i < points; i++) {
-      output[i] = 0;
-    }
+    zeroArray(output);
 
     let timeIndex = currentTime;
 
@@ -201,6 +282,32 @@ class Pvoc {
     }
 
     return output;
+  }
+
+  overlapAdd({
+    inputSamples,
+    synthesisWindow,
+    outputBuffer,
+    currentTime,
+    points,
+    windowSize,
+  }) {
+    let timeIndex = currentTime;
+
+    while (timeIndex < 0) {
+      timeIndex += points;
+    }
+
+    timeIndex %= points;
+
+    for (let i = 0; i < windowSize; i++) {
+      outputBuffer[i] += inputSamples[timeIndex] * synthesisWindow[i];
+
+      timeIndex++;
+      if (timeIndex === points) {
+        timeIndex = 0;
+      }
+    }
   }
 }
 
