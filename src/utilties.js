@@ -30,7 +30,7 @@ const floatToExtended = (number) => {
 
   // write the sign and new exponent to the buffer
   if (number < 0) {
-    output.writeInt16BE(newExponent + 0x8000);
+    output.writeUInt16BE(newExponent + 0x8000);
   } else {
     output.writeInt16BE(newExponent);
   }
