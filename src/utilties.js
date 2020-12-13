@@ -32,7 +32,7 @@ const floatToExtended = (number) => {
   if (number < 0) {
     output.writeUInt16BE(newExponent + 0x8000);
   } else {
-    output.writeInt16BE(newExponent);
+    output.writeUInt16BE(newExponent);
   }
 
   // grab all the bits from the original buffer

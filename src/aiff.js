@@ -1,29 +1,34 @@
-import FileBuffer from './file_buffer';
-import { Float80 } from 'float80';
+/* eslint-disable no-multi-spaces */
+
 import memoize from 'fast-memoize';
+import { Float80 } from 'float80';
+import FileBuffer from './file_buffer';
+import { floatToExtended } from './utilties';
+import { statAsync } from './fs';
 
 class Aiff {
   constructor(filePath) {
     this.fileBuffer = new FileBuffer(filePath);
+    this.filePath = filePath;
     this.chunks = {
       FORM: {
         start: 0,
-        size: null,             // long:     4 bytes
-        formType: null,         // chars:    4 bytes
+        size: 0,                // long:     4 bytes
+        formType: '',           // chars:    4 bytes
       },
       COMM: {
         start: 0,
         size: 18,               // long:     4 bytes
-        numChannels: null,      // short:    2 bytes
-        numSampleFrames: null,  // ulong:    4 bytes
-        sampleSize: null,       // short:    2 bytes
-        sampleRate: null,       // extended: 10 bytes
+        numChannels: 0,         // short:    2 bytes
+        numSampleFrames: 0,     // ulong:    4 bytes
+        sampleSize: 0,          // short:    2 bytes
+        sampleRate: 0,          // extended: 10 bytes
       },
       SSND: {
         start: 0,
-        size: null,             // long:     4 bytes
-        offset: null,           // ulong:    4 bytes
-        blockSize: null,        // ulong:    4 bytes
+        size: 0,                // long:     4 bytes
+        offset: 0,              // ulong:    4 bytes
+        blockSize: 0,           // ulong:    4 bytes
       },
     };
 
@@ -68,7 +73,7 @@ class Aiff {
 
   // how many bytes are needed to store one sample?
   get sampleStorageBytes() {
-    const computation = memoize(sampleSize => Math.ceil(sampleSize / 8));
+    const computation = memoize((sampleSize) => Math.ceil(sampleSize / 8));
     return computation(this.chunks.COMM.sampleSize);
   }
 
@@ -96,38 +101,13 @@ class Aiff {
     return this.fileBuffer.openForRead().then(() => this.parse());
   }
 
-  async openForWrite({
-    sampleRate,
-    bitDepth,
-    numChannels,
-  }) {
-    const {
-      COMM,
-      FORM,
-      SSND,
-    } = this.chunks;
-
-    FORM.size = 0;
-    FORM.formType = 'AIFF';
-
-    COMM.start = 12;
-    COMM.numChannels = numChannels;
-    COMM.numSampleFrames = 0;
-    COMM.sampleSize = bitDepth;
-    COMM.sampleRate = sampleRate;
-
-    SSND.start = 30;
-
-    return this.fileBuffer.openForWrite();
-  }
-
   // seek through file to find all chunks and populate
   // this.chunks
   async parse() {
     // loop all the chunks and find the ones we need, populate the data
     let eof = false;
     let nextChunkStart = 0;
-    let fileSize = 0;
+    const { size } = await statAsync(this.filePath);
 
     while (!eof) {
       const chunkHeader = await this.readNextChunkHeader(nextChunkStart);
@@ -135,29 +115,27 @@ class Aiff {
       switch (chunkHeader.chunkId) {
         case 'FORM':
           await this.parseForm(nextChunkStart);
+          nextChunkStart = 12;
           break;
         case 'COMM':
           await this.parseComm(nextChunkStart);
+          nextChunkStart = nextChunkStart + 8 + chunkHeader.size;
           break;
         case 'SSND':
           await this.parseSsnd(nextChunkStart);
+          nextChunkStart = nextChunkStart + 16 + chunkHeader.size;
           break;
       }
 
-      if (chunkHeader.chunkId === 'FORM') {
-        nextChunkStart = 12;
-        fileSize = 8 + chunkHeader.size;
-      } else {
-        nextChunkStart = nextChunkStart + 8 + chunkHeader.size;
-
+      if (chunkHeader.chunkId !== 'FORM') {
         // if odd, account for the padding byte at end of data
         if (chunkHeader.size % 2 !== 0) {
           nextChunkStart = nextChunkStart + 1;
         }
       }
 
-      eof = nextChunkStart >= fileSize;
-    };
+      eof = nextChunkStart >= size;
+    }
 
     if (!this.chunks.COMM.start) {
       throw new Error('File does not have COMM Chunk');
@@ -294,7 +272,7 @@ class Aiff {
           const sample = sampleBuffer.readInt32BE();
 
           // bit shift in JS:
-          samplesByChannel[j][i] = sample / Math.pow(2, paddingBits);
+          samplesByChannel[j][i] = Math.floor(sample / Math.pow(2, paddingBits));
         }
       }
 
@@ -305,7 +283,7 @@ class Aiff {
   // return an iterator that will grab <size> samples at a time
   // if size is undefined, the iterator will grab all data on first read
   // yields array of channels which will contain up to <size> samples
-  *samplesIterator(size) {
+  * samplesIterator(size) {
     let nextSampleFrameStart = 0;
     const { numSampleFrames } = this.chunks.COMM;
 
@@ -319,13 +297,82 @@ class Aiff {
         sampleFramesToRead,
       });
 
-      nextSampleFrameStart = nextSampleFrameStart + sampleFramesToRead;
+      nextSampleFrameStart += sampleFramesToRead;
       sampleFramesRemaining = numSampleFrames - nextSampleFrameStart;
     }
   }
 
   async close() {
     return this.fileBuffer.close();
+  }
+
+  async openForWrite({
+    sampleRate,
+    bitDepth,
+    numChannels,
+  }) {
+    const {
+      COMM,
+      FORM,
+      SSND,
+    } = this.chunks;
+
+    FORM.size = 0;
+    FORM.formType = 'AIFF';
+
+    COMM.start = 12;
+    COMM.numChannels = numChannels;
+    COMM.numSampleFrames = 0;
+    COMM.sampleSize = bitDepth;
+    COMM.sampleRate = sampleRate;
+
+    SSND.start = 38;
+
+    return this.fileBuffer.openForWrite().then(() => (
+      this.fileBuffer.append(this.formChunkToBuffer())
+    )).then(() => (
+      this.fileBuffer.append(this.commChunkToBuffer())
+    )).then(() => (
+      this.fileBuffer.append(this.ssndChunkToBuffer())
+    ));
+  }
+
+  formChunkToBuffer() {
+    const { FORM } = this.chunks;
+    const buffer = Buffer.alloc(12);
+    buffer.write('FORM');
+    buffer.writeInt32BE(FORM.size, 4);
+    buffer.write('AIFF', 8);
+    return buffer;
+  }
+
+  commChunkToBuffer() {
+    const { COMM } = this.chunks;
+    const buffer = Buffer.alloc(26);
+    buffer.write('COMM');
+    buffer.writeInt32BE(COMM.size, 4);
+    buffer.writeInt16BE(COMM.numChannels, 8);
+    buffer.writeUInt32BE(COMM.numSampleFrames, 10);
+    buffer.writeInt16BE(COMM.sampleSize, 14);
+    const sampleRateFloat80 = floatToExtended(COMM.sampleRate);
+    sampleRateFloat80.copy(buffer, 16);
+    return buffer;
+  }
+
+  ssndChunkToBuffer() {
+    const { SSND } = this.chunks;
+    const buffer = Buffer.alloc(16);
+    buffer.write('SSND');
+    buffer.writeInt32BE(SSND.size, 4);
+    buffer.writeUInt32BE(SSND.offset, 8);
+    buffer.writeUInt32BE(SSND.blockSize, 12);
+    return buffer;
+  }
+
+  // chanels is an array of arrays where each sub-array
+  // is sample data for that channel
+  writeSamples(channels) {
+    console.log(channels[0]);
   }
 }
 

@@ -1,4 +1,5 @@
 import Aiff from './aiff';
+import { unlinkIfExists } from '../test/helpers';
 
 const strings_path = './test/aiffs/strings.aif';
 
@@ -81,6 +82,59 @@ describe("#samplesIterator", () => {
           channel1.push(...samplesArray[0]);
         }
       });
+    });
+  });
+});
+
+describe('#openForWrite', () => {
+  const fileName = '/tmp/aiff_headers.aiff';
+  let aiffOut;
+
+  beforeEach(() => {
+    unlinkIfExists(fileName);
+
+    aiffOut = new Aiff(fileName);
+  });
+
+  afterEach(() => {
+    unlinkIfExists(fileName);
+  });
+
+  test.only('file contains correct chunk data after open', () => {
+    const aiffIn = new Aiff(fileName);
+
+    return aiffOut.openForWrite({
+      sampleRate: 48000,
+      bitDepth: 24,
+      numChannels: 1,
+    }).then(() => aiffOut.close()).then(() => {
+      return aiffIn.openForRead();
+    }).then(() => (
+      aiffIn.close()
+    )).then(() => {
+      expect(aiffIn.chunks).toEqual(
+        expect.objectContaining({
+          FORM: {
+            start: 0,
+            size: 0,
+            formType: 'AIFF',
+          },
+          COMM: {
+            start: 12,
+            size: 18,
+            numChannels: 1,
+            numSampleFrames: 0,
+            sampleSize: 24,
+            sampleRate: 48000,
+          },
+          SSND: {
+            start: 38,
+            size: 0,
+            offset: 0,
+            blockSize: 0,
+          },
+        }),
+      );
     });
   });
 });

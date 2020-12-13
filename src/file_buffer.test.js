@@ -1,23 +1,6 @@
 import FileBuffer from './file_buffer';
-import fs, { unlinkSync, readFile } from 'fs';
 import { readFileAsync } from './fs';
-
-const exists = (filepath) => {
-  let flag = true;
-  try {
-    fs.accessSync(filepath, fs.constants.F_OK);
-  } catch(e) {
-    flag = false;
-  }
-
-  return flag;
-};
-
-const unlinkIfExists = (fileName) => {
-  if (exists(fileName)) {
-    unlinkSync(fileName);
-  }
-};
+import { unlinkIfExists } from '../test/helpers';
 
 describe('#readNext', () => {
   describe('when reading exact file length', () => {
