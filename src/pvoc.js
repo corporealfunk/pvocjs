@@ -167,10 +167,11 @@ class Pvoc {
 
       // shift into the input buffer samples from the audio file:
       const { done, value } = samplesIterator.next();
+      const channels = await value;
 
       if (!done) {
         // index 0 is 1st channel's samples
-        const channel = value[0];
+        const channel = channels[0];
 
         // pad with 0's to match decimation length if needed:
         for (let i = 0; i < this.decimation - channel.length; i++) {
@@ -228,7 +229,7 @@ class Pvoc {
 
         // spectrum to samples in place:
         RealFFT({
-          spectrum: cartSpectrum,
+          data: cartSpectrum,
           halfPoints: this.halfPoints,
           FFT_FREQ2TIME,
         });
