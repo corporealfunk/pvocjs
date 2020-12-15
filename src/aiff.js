@@ -71,6 +71,18 @@ class Aiff {
     };
   }
 
+  get sampleRate() {
+    return this.chunks.COMM.sampleRate;
+  }
+
+  get bitDepth() {
+    return this.chunks.COMM.sampleSize;
+  }
+
+  get numChannels() {
+    return this.chunks.COMM.numChannels;
+  }
+
   // how many bytes are needed to store one sample?
   get sampleStorageBytes() {
     const computation = memoize((sampleSize) => Math.ceil(sampleSize / 8));
