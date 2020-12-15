@@ -23,13 +23,13 @@ class FileBuffer {
     this.pointer = 0;
   }
 
-  async openForWrite() {
+  async openForWrite(mode = 'wx') {
     if (this.fd !== null) {
       throw new Error('FileBuffer already has open file');
     }
 
     // file descriptor
-    this.fd = await openAsync(this.filePath, 'wx');
+    this.fd = await openAsync(this.filePath, mode);
 
     // next byte to read from file
     this.pointer = 0;

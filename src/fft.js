@@ -88,7 +88,11 @@ const FFT = ({ data, halfPoints, direction }) => {
     }
   }
 
-  if (direction === FFT_FREQ2TIME) {
+  // SoundHack original scales after taking the inverse FFT (iFFT)
+  // however scaling after forward FFT provides better amplitude
+  // results
+  // ORIGINAL: if (direction === FFT_FREQ2TIME) {
+  if (direction === FFT_TIME2FREQ) {
     const scale = 1.0 / halfPoints;
     for (let i = 0; i < halfPoints * 2; i++) {
       data[i] *= scale;

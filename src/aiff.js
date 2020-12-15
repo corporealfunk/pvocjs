@@ -74,7 +74,8 @@ class Aiff {
   // how many bytes are needed to store one sample?
   get sampleStorageBytes() {
     const computation = memoize((sampleSize) => Math.ceil(sampleSize / 8));
-    return computation(this.chunks.COMM.sampleSize);
+    const result = computation(this.chunks.COMM.sampleSize);
+    return result;
   }
 
   // how many bits are at the end of the sample that are zero pads?
@@ -95,6 +96,16 @@ class Aiff {
   get soundDataStart() {
     const computation = memoize(start => start + 16);
     return computation(this.chunks.SSND.start);
+  }
+
+  // helper to return a two element array of low and high sample value range
+  // based on bit depth
+  get bitDepthRange() {
+    const computation = memoize(bitDepth => [
+      -(2 ** (bitDepth - 1)),
+      (2 ** (bitDepth - 1) -1),
+    ]);
+    return computation(this.chunks.COMM.sampleSize);
   }
 
   async openForRead() {
@@ -317,7 +328,7 @@ class Aiff {
       SSND,
     } = this.chunks;
 
-    FORM.size = 0;
+    FORM.size = 4;
     FORM.formType = 'AIFF';
 
     COMM.start = 12;
@@ -326,7 +337,14 @@ class Aiff {
     COMM.sampleSize = bitDepth;
     COMM.sampleRate = sampleRate;
 
+    // COMM headers + it's size:
+    FORM.size += 8 + COMM.size;
+
     SSND.start = 38;
+    SSND.size = 8;
+
+    // SSND headers + it's size:
+    FORM.size += 8 + SSND.size;
 
     return this.fileBuffer.openForWrite().then(() => (
       this.fileBuffer.append(this.formChunkToBuffer())
@@ -370,9 +388,108 @@ class Aiff {
   }
 
   // chanels is an array of arrays where each sub-array
-  // is sample data for that channel
-  writeSamples(channels) {
-    console.log(channels[0]);
+  // is sample data for that channel,
+  // this is going to appended to the end of the file
+  // channels is an array, where each element is a subarray of
+  // js Number point samples for a given channel
+  // we will handle rounding and bit padding into bit depth
+  // needed. Any extra channels beyond our storage needs
+  // will be tossed. If you send fewer than our storage needs,
+  // extra channels will be Zeroed
+  async writeSamples(channels) {
+    if (channels.length === 0) {
+      throw new Error('Cannot write 0 channels');
+    }
+
+    // TODO: we can only have a file where the FORM.size must be < (2**32-1) - 1
+    // guard against overages
+    const numInputSamples = channels[0].length;
+    const { numChannels } = this.chunks.COMM;
+
+    const output = Buffer.alloc(this.sampleFrameSize * numInputSamples);
+
+    console.log('numInputSamples', numInputSamples);
+    console.log('output buffer size', output.length);
+
+    // where in the buffer to write the next frame:
+    let nextSampleFrameI = 0;
+    for (let i = 0; i < numInputSamples; i++) {
+      for (let x = 0; x < numChannels; x++) {
+        console.log(' - sample/channel', i, x);
+        const nextSampleI = nextSampleFrameI + (x * this.sampleStorageBytes);
+        let sample = Math.round(channels[x][i]);
+
+        // if it is outside the bit depth range, clip it
+        if (sample < this.bitDepthRange[0]) {
+          sample = this.bitDepthRange[0];
+        } else if (sample > this.bitDepthRange[1]) {
+          sample = this.bitDepthRange[1];
+        }
+
+        // pad the sample by shifting left if needed
+        if (this.sampleZeroPadBits > 0) {
+          sample *= 2 ** this.sampleZeroPadBits;
+        }
+
+        switch (this.sampleStorageBytes) {
+          case 1:
+            output.writeInt8(sample, nextSampleI);
+            break;
+          case 2:
+            output.writeInt16BE(sample, nextSampleI);
+            break;
+          case 3:
+            const tmpBuffer = Buffer.alloc(4);
+
+            // shift it one more byte over
+            const storageSample = sample * (2 ** 8);
+
+            // write 4 bytes (the last byte is now padding)
+            tmpBuffer.writeInt32BE(storageSample);
+
+            // copy only the first 3 bytes
+            tmpBuffer.copy(output, nextSampleI, 0, 3);
+            break;
+          case 4:
+            output.writeInt32BE(sample, nextSampleI);
+            break;
+          default:
+            throw new Error(`sampleStorageBytes must be within range 1-4 inclusive, got ${this.sampleStorageBytes}`);
+        }
+      }
+      nextSampleFrameI += this.sampleFrameSize;
+    }
+
+    // write output to disk
+    await this.fileBuffer.append(output);
+
+    // update counters:
+    const { FORM, COMM, SSND } = this.chunks;
+    COMM.numSampleFrames += numInputSamples;
+    SSND.size += numInputSamples * this.sampleFrameSize;
+    FORM.size += numInputSamples * this.sampleFrameSize;
+    await this.updateChunkHeadersOnDisk();
+  }
+
+  async updateChunkHeadersOnDisk() {
+    const headerBuffer = new FileBuffer(this.filePath);
+
+    return headerBuffer.openForWrite('r+').then(() => (
+      headerBuffer.write({
+        start: 0,
+        buffer: this.formChunkToBuffer(),
+      })
+    )).then(() => (
+      headerBuffer.write({
+        start: this.chunks.COMM.start,
+        buffer: this.commChunkToBuffer(),
+      })
+    )).then(() => (
+      headerBuffer.write({
+        start: this.chunks.SSND.start,
+        buffer: this.ssndChunkToBuffer(),
+      })
+    )).then(() => headerBuffer.close());
   }
 }
 

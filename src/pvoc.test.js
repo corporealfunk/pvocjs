@@ -42,10 +42,10 @@ describe('#findBestTimeScaleRatio', () => {
 });
 
 describe('run', () => {
-  const bits16 = './test/aiffs/mono_441k_16b_sine.aif';
+  const a440 = './test/aiffs/mono_44k_16b_sine_a440.aif';
 
   it.only('runs', () => {
-    const aiffIn = new Aiff(bits16);
+    const aiffIn = new Aiff(a440);
     const allSamples = [];
     const dummyOut = {
       writeSamples: (channels) => {
@@ -54,7 +54,7 @@ describe('run', () => {
     };
 
     const pvoc = new Pvoc({
-      bands: 512,
+      bands: 1024,
       overlap: 1,
       scaleFactor: 1,
     });
@@ -70,5 +70,5 @@ describe('run', () => {
         pvoc.windowSize,
       );
     });
-  });
+  }, 180000);
 });
