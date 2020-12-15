@@ -1,5 +1,6 @@
 import Pvoc from './pvoc';
 import Aiff from './aiff';
+import { unlinkIfExists } from '../test/helpers';
 
 describe('#findBestTimeScaleRatio', () => {
   test('desired ratio is > 1', () => {
@@ -43,15 +44,28 @@ describe('#findBestTimeScaleRatio', () => {
 
 describe('run', () => {
   const a440 = './test/aiffs/mono_44k_16b_sine_a440.aif';
+  const fileName = '/tmp/aiff_pvoc_run_test.aiff';
+  let aiffOut;
 
-  it.only('runs', () => {
+  beforeEach(() => {
+    unlinkIfExists(fileName);
+
+    aiffOut = new Aiff(fileName);
+
+    return aiffOut.openForWrite({
+      sampleRate: 44100,
+      bitDepth: 16,
+      numChannels: 1,
+    });
+  });
+
+  afterEach(() => {
+    unlinkIfExists(fileName);
+  });
+
+  it('runs', () => {
     const aiffIn = new Aiff(a440);
     const allSamples = [];
-    const dummyOut = {
-      writeSamples: (channels) => {
-        allSamples.push(...channels[0]);
-      },
-    };
 
     const pvoc = new Pvoc({
       bands: 1024,
@@ -60,7 +74,7 @@ describe('run', () => {
     });
 
     return aiffIn.openForRead().then(() => {
-      return pvoc.run(aiffIn, dummyOut);
+      return pvoc.run(aiffIn, aiffOut);
     }).then(() => {
       console.log('points/halfPoints/decimation/interpolation/windowSize',
         pvoc.points,

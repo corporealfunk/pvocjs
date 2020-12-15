@@ -16,6 +16,9 @@ import {
   zeroArray,
 } from './utilties';
 
+// TEST
+// import Tapper from './tap'; // TAPPR
+
 import {
   cartToPolar,
   polarToCart,
@@ -31,12 +34,12 @@ class Pvoc {
     overlap,        // overlap factor: 4,2,1,0.5
     scaleFactor,    // time scale factor
   }) {
-    if (![4096, 2048, 1024, 512, 256, 128, 64, 32, 8].includes(bands)) {
-      throw new Error('bands must be a power of two between 8-4092');
+    if (![4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8].includes(bands)) {
+      throw new Error(`bands must be a power of two between 8-4096 got ${bands}`);
     }
 
     if (![0.5, 1, 2, 4].includes(overlap)) {
-      throw new Error('overlap must be one of: .5, 1, 2, 4');
+      throw new Error(`overlap must be one of: .5, 1, 2, 4, got ${overlap}`);
     }
 
     // points the number of data points required to store an FFT
@@ -156,6 +159,7 @@ class Pvoc {
     // where we are in the input/output in samples
     let inPointer = -this.windowSize;
     let outPointer = (inPointer * this.interpolation) / this.decimation;
+    outPointer = outPointer < 0 ? Math.floor(outPointer) : Math.ceil(outPointer);
 
     // only do mono right now:
     const inputBuffer = new SlidingBuffer(this.windowSize);
@@ -183,7 +187,16 @@ class Pvoc {
           channel.push(0);
         }
 
+        // Tapper.accumulate('raw_samples_padded', channel); // TAPPR
+
         inputBuffer.shiftIn(channel);
+
+        // Tapper.accumulate('input_buffer', inputBuffer.buffer); // TAPPR
+        // Tapper.accumulate('a_window', analysisWindow); // TAPPR
+        // Tapper.accumulate('scaled_a_window', scaledAnalysisWindow); // TAPPR
+        // Tapper.accumulate('s_window', synthesisWindow); // TAPPR
+        // Tapper.accumulate('scaled_s_window', scaledSynthesisWindow); // TAPPR
+        // Tapper.accumulate('in_pointer', [inPointer]); // TAPPR
 
         // window fold:
         const foldedSamples = this.windowFold({
@@ -193,6 +206,8 @@ class Pvoc {
           points: this.points,
           windowSize: this.windowSize,
         });
+
+        // Tapper.accumulate('folded_samples', foldedSamples); // TAPPR
 
         // FFT in-place:
         RealFFT({
@@ -204,11 +219,15 @@ class Pvoc {
         // foldedSamples now contains the spectrum for each band:
         const spectrum = foldedSamples;
 
+        // Tapper.accumulate('spectrum', spectrum); // TAPPR
+
         // get a polar spectrum out of it:
         const polarSpectrum = cartToPolar({
           spectrum,
           halfPoints: this.halfPoints,
         });
+
+        // Tapper.accumulate('polar_spectrum', polarSpectrum); // TAPPR
 
         // constrain amplitudes in place:
         simpleSpectralGate({
@@ -217,6 +236,8 @@ class Pvoc {
           minAmplitude: 0, // seems to always be 0 in SoundHack
           halfPoints: this.halfPoints,
         });
+
+        // Tapper.accumulate('polar_spectrum_constrained', polarSpectrum); // TAPPR
 
         // phase interpolate in place:
         phaseInterpolate({
@@ -227,10 +248,14 @@ class Pvoc {
           phaseLocking: false, // seems to always be false in SoundHack
         });
 
+        // Tapper.accumulate('polar_spectrum_phase_interpolated', polarSpectrum); // TAPPR
+
         const cartSpectrum = polarToCart({
           polarSpectrum,
           halfPoints: this.halfPoints,
         });
+
+        // Tapper.accumulate('cart_spectrum', cartSpectrum); // TAPPR
 
         // spectrum to samples in place:
         RealFFT({
@@ -240,6 +265,10 @@ class Pvoc {
         });
 
         const fftResynth = cartSpectrum;
+
+        // Tapper.accumulate('fft_resynth', fftResynth); // TAPPR
+        // Tapper.accumulate('output_buffer_b4', outputBuffer.buffer); // TAPPR
+        // Tapper.accumulate('out_pointer', [outPointer]); // TAPPR
 
         // overlap add into the contents of our buffer
         this.overlapAdd({
@@ -251,9 +280,18 @@ class Pvoc {
           windowSize: this.windowSize,
         });
 
-        outputSoundData.writeSamples(
-          [outputBuffer.shiftLeft(this.interpolation)],
-        );
+        // Tapper.accumulate('output_buffer_after', outputBuffer.buffer); // TAPPR
+        const writeToDisk = outputBuffer.shiftLeft(this.interpolation);
+
+        if (outPointer > 0) {
+          // Tapper.accumulate('write_to_disk', writeToDisk); // TAPPR
+          outputSoundData.writeSamples(
+            [writeToDisk],
+          );
+        } else {
+          // Tapper.accumulate('write_to_disk', [0]); // TAPPR
+        }
+        // await Tapper.flush(); // TAPPR
       }
 
       eof = done;
@@ -307,6 +345,7 @@ class Pvoc {
     timeIndex %= points;
 
     for (let i = 0; i < windowSize; i++) {
+      // Tapper.accumulate('output_time_index', [timeIndex]); // TAPPR
       outputBuffer[i] += inputSamples[timeIndex] * synthesisWindow[i];
 
       timeIndex++;

@@ -149,7 +149,7 @@ describe('#scaleWindows', () => {
   describe('when windowSize > points', () => {
     test('returns correct scaled window', () => {
       const pvoc = new Pvoc({
-        points: 16,
+        bands: 8,
         overlap: 2,
         scaleFactor: 2,
       });
@@ -207,7 +207,7 @@ describe('#scaleWindows', () => {
   describe('when windowSize < points', () => {
     test('returns correct scaled window', () => {
       const pvoc = new Pvoc({
-        points: 16,
+        bands: 8,
         overlap: .5,
         scaleFactor: 2,
       });
