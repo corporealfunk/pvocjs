@@ -60,7 +60,9 @@ describe('run', () => {
   });
 
   afterEach(() => {
-    unlinkIfExists(fileName);
+    return aiffOut.close().then(() => {
+      unlinkIfExists(fileName);
+    });
   });
 
   it('runs', () => {
@@ -75,14 +77,8 @@ describe('run', () => {
 
     return aiffIn.openForRead().then(() => {
       return pvoc.run(aiffIn, aiffOut);
-    }).then(() => {
-      console.log('points/halfPoints/decimation/interpolation/windowSize',
-        pvoc.points,
-        pvoc.halfPoints,
-        pvoc.decimation,
-        pvoc.interpolation,
-        pvoc.windowSize,
-      );
+    }).then(() => aiffIn.close()).then(() => {
+      // no expectation
     });
   }, 180000);
 });
