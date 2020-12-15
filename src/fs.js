@@ -7,6 +7,7 @@ const openAsync = promisify(fs.open);
 const closeAsync = promisify(fs.close);
 const readFileAsync = promisify(fs.readFile);
 const statAsync = promisify(fs.stat);
+const writeFileAsync = promisify(fs.writeFile);
 
 export {
   readAsync,
@@ -15,4 +16,5 @@ export {
   closeAsync,
   readFileAsync,
   statAsync,
+  writeFileAsync,
 };

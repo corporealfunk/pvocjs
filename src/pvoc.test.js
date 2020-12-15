@@ -1,9 +1,10 @@
 import Pvoc from './pvoc';
+import Aiff from './aiff';
 
 describe('#findBestTimeScaleRatio', () => {
   test('desired ratio is > 1', () => {
     const pvoc = new Pvoc({
-      points: 8192,
+      bands: 4096,
       overlap: 4,
       scaleFactor: 1000,
     });
@@ -22,7 +23,7 @@ describe('#findBestTimeScaleRatio', () => {
 
   test('desired ratio is < 1', () => {
     const pvoc = new Pvoc({
-      points: 8192,
+      bands: 4096,
       overlap: 4,
       scaleFactor: .01,
     });
@@ -37,5 +38,37 @@ describe('#findBestTimeScaleRatio', () => {
         newScaleFactor: 40/4039,
       }),
     );
+  });
+});
+
+describe('run', () => {
+  const bits16 = './test/aiffs/mono_441k_16b_sine.aif';
+
+  it.only('runs', () => {
+    const aiffIn = new Aiff(bits16);
+    const allSamples = [];
+    const dummyOut = {
+      writeSamples: (channels) => {
+        allSamples.push(...channels[0]);
+      },
+    };
+
+    const pvoc = new Pvoc({
+      bands: 512,
+      overlap: 1,
+      scaleFactor: 1,
+    });
+
+    return aiffIn.openForRead().then(() => {
+      return pvoc.run(aiffIn, dummyOut);
+    }).then(() => {
+      console.log('points/halfPoints/decimation/interpolation/windowSize',
+        pvoc.points,
+        pvoc.halfPoints,
+        pvoc.decimation,
+        pvoc.interpolation,
+        pvoc.windowSize,
+      );
+    });
   });
 });

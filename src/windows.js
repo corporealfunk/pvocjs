@@ -113,7 +113,7 @@ const getTriangle = memoize((size) => {
  * analysisWindow: array of the analysis window to scale
  * synthesisWindow: array of the synthesis window to scale
  * windowSize: the windowSize of the FFT to be performed
- * points: the number of FFT bands we are going to compute
+ * points: the number of points required to store an FFT (2x bands)
  * interpolation: synthesis rate
  *
  * this code is from SoundHack/PhaseVocoderRoutines.c:15

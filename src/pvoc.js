@@ -25,25 +25,27 @@ import {
 
 import SlidingBuffer from './sliding_buffer';
 
-// TODO: points is a bad variable name, see:
-// https://github.com/tomerbe/SoundHack/issues/2
 class Pvoc {
   constructor({
-    points,         // number of FFT bins/bands
+    bands,          // number of FFT bins/bands
     overlap,        // overlap factor: 4,2,1,0.5
     scaleFactor,    // time scale factor
   }) {
-    if (![8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16].includes(points)) {
-      throw new Error('points must be a power of two between 16-8192');
+    if (![4096, 2048, 1024, 512, 256, 128, 64, 32, 8].includes(bands)) {
+      throw new Error('bands must be a power of two between 8-4092');
     }
 
     if (![0.5, 1, 2, 4].includes(overlap)) {
       throw new Error('overlap must be one of: .5, 1, 2, 4');
     }
 
-    this.points = points;
-    this.halfPoints = points / 2;
-    this.windowSize = points * overlap;
+    // points the number of data points required to store an FFT
+    // for the desired number of bands
+    this.points = bands * 2;
+
+    // which means that halfPoints === bands
+    this.halfPoints = this.points / 2;
+    this.windowSize = this.points * overlap;
     this.overlap = overlap;
 
     // find the best analysis/synthesis ratio that gets us close
@@ -137,19 +139,22 @@ class Pvoc {
   }
 
   async run(inputSoundData, outputSoundData) {
+    const analysisWindow = getHamming(this.windowSize);
+    const synthesisWindow = getHamming(this.windowSize);
+
     const {
       scaledAnalysisWindow,
       scaledSynthesisWindow,
     } = scaleWindows({
-      analysisWindow: getHamming(this.windowSize),
-      synthesisWindow: getHamming(this.windowSize),
+      analysisWindow,
+      synthesisWindow,
       windowSize: this.windowSize,
       points: this.points,
       interpolation: this.interpolation,
     });
 
     // where we are in the input/output in samples
-    let inPointer = -1 * this.windowSize;
+    let inPointer = -this.windowSize;
     let outPointer = (inPointer * this.interpolation) / this.decimation;
 
     // only do mono right now:
@@ -276,7 +281,7 @@ class Pvoc {
     for (let i = 0; i < windowSize; i++) {
       output[timeIndex] += inputSamples[i] * analysisWindow[i];
 
-      timeIndex++;
+      timeIndex += 1;
       if (timeIndex === points) {
         timeIndex = 0;
       }

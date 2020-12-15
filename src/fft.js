@@ -59,7 +59,8 @@ const FFT = ({ data, halfPoints, direction }) => {
   let twoMMax = 0;
   let n = 0;
 
-  for (let nMax = 2; nMax < halfPoints; nMax = twoMMax) {
+  const numberData = halfPoints * 2;
+  for (let nMax = 2; nMax < numberData; nMax = twoMMax) {
     twoMMax = nMax * 2;
 
     const omegaPiReal = gOmegaPiTables.real[n];
@@ -72,7 +73,7 @@ const FFT = ({ data, halfPoints, direction }) => {
     for (let m = 0; m < nMax; m += 2) {
       let realTemp;
       let imagTemp;
-      for (let i = m; i < halfPoints; i += twoMMax) {
+      for (let i = m; i < numberData; i += twoMMax) {
         const j = i + nMax;
         realTemp = (omegaReal * data[j]) - (omegaImag * data[j + 1]);
         imagTemp = (omegaReal * data[j + 1]) + (omegaImag * data[j]);
