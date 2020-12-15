@@ -1,16 +1,21 @@
+import { zeroArray } from './utilties';
+
 class SlidingBuffer {
   constructor(size) {
     this.size = size;
 
     this.buffer = Array(size);
+    zeroArray(this.buffer);
 
-    for (let i = 0; i < size; i++) {
-      this.buffer[i] = 0;
-    }
+    this.lastValidDataI = size;
+  }
+
+  get hasValidData() {
+    return (this.lastValidDataI >= 0 && this.lastValidDataI < this.size);
   }
 
   // returns to you the data that got shifted out
-  shiftIn(data) {
+  shiftIn(data, validData = true) {
     if (data.length > this.size) {
       throw new Error('Cannot shiftIn more data than buffer size');
     }
@@ -19,6 +24,10 @@ class SlidingBuffer {
 
     this.buffer = this.buffer.slice(data.length, this.buffer.length);
     this.buffer.push(...data);
+
+    if (validData) {
+      this.lastValidDataI = this.size - 1;
+    }
 
     return shiftedOut;
   }
@@ -31,12 +40,10 @@ class SlidingBuffer {
     }
 
     const data = Array(length);
+    zeroArray(data);
 
-    for (let i = 0; i < data.length; i++) {
-      data[i] = 0;
-    }
-
-    return this.shiftIn(data);
+    this.lastValidDataI -= length;
+    return this.shiftIn(data, false);
   }
 }
 

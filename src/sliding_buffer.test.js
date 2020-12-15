@@ -63,3 +63,43 @@ describe('#shiftLeft', () => {
     expect(buffer.shiftLeft(3)).toEqual([10,11,12]);
   });
 });
+
+describe('#hasValidData', () => {
+  describe('when fresh', () => {
+    const buffer = new SlidingBuffer(5);
+
+    it('returns false', () => {
+      expect(buffer.hasValidData).toEqual(false);
+    });
+  });
+
+  describe('when data is shifted in', () => {
+    const buffer = new SlidingBuffer(5);
+
+    it('returns true', () => {
+      buffer.shiftIn([1,2,3]);
+      expect(buffer.hasValidData).toEqual(true);
+    });
+  });
+
+  describe('when data is shiftedOut', () => {
+    describe('when buffer still has valid data', () => {
+      const buffer = new SlidingBuffer(5);
+
+      it('returns true', () => {
+        buffer.shiftIn([1,2,3]);
+        expect(buffer.hasValidData).toEqual(true);
+      });
+    });
+
+    describe('when buffer has no valid data left', () => {
+      const buffer = new SlidingBuffer(5);
+
+      it('returns false', () => {
+        buffer.shiftIn([1,2,3]);
+        buffer.shiftLeft(5);
+        expect(buffer.hasValidData).toEqual(false);
+      });
+    });
+  });
+});
