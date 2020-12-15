@@ -285,7 +285,7 @@ class Pvoc {
       // Tapper.accumulate('output_buffer_after', outputBuffer.buffer); // TAPPR
       const writeToDisk = outputBuffer.shiftLeft(this.interpolation);
 
-      if (outPointer > 0) {
+      if (outPointer >= 0) {
         // Tapper.accumulate('write_to_disk', writeToDisk); // TAPPR
         outputSoundData.writeSamples(
           [writeToDisk],
