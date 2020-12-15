@@ -219,7 +219,7 @@ describe('#writeSamples', () => {
   });
 
   afterEach(() => {
-    // unlinkIfExists(fileName);
+    unlinkIfExists(fileName);
   });
 
   test('headers are correct after write', () => {

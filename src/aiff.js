@@ -408,14 +408,10 @@ class Aiff {
 
     const output = Buffer.alloc(this.sampleFrameSize * numInputSamples);
 
-    console.log('numInputSamples', numInputSamples);
-    console.log('output buffer size', output.length);
-
     // where in the buffer to write the next frame:
     let nextSampleFrameI = 0;
     for (let i = 0; i < numInputSamples; i++) {
       for (let x = 0; x < numChannels; x++) {
-        console.log(' - sample/channel', i, x);
         const nextSampleI = nextSampleFrameI + (x * this.sampleStorageBytes);
         let sample = Math.round(channels[x][i]);
 
