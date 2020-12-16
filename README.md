@@ -28,3 +28,11 @@ npm
 `npm run-script build`
 
 first so that your changes are available to the cli.
+
+# Run Tests:
+
+`npm test`
+
+# Run Linter:
+
+`npm run-script lint`
