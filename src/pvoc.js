@@ -66,6 +66,8 @@ class Pvoc {
 
     // synthesis rate:
     this.interpolation = ratioResult.interpolation;
+
+    this.eventListeners = {};
   }
 
   // takes in the windowsize and desired scaleFactor
@@ -141,7 +143,25 @@ class Pvoc {
     };
   }
 
+  on(eventName, cb) {
+    if (!this.eventListeners[eventName]) {
+      this.eventListeners[eventName] = [cb];
+    } else {
+      this.eventListeners[eventName].push(cb);
+    }
+  }
+
+  trigger(eventName, ...data) {
+    const cbs = this.eventListeners[eventName];
+
+    if (cbs) {
+      cbs.forEach((cb) => cb(...data));
+    }
+  }
+
   async run(inputSoundData, outputSoundData) {
+    const totalInputSamples = inputSoundData.numSamples;
+
     const analysisWindow = getHamming(this.windowSize);
     const synthesisWindow = getHamming(this.windowSize);
 
@@ -170,7 +190,10 @@ class Pvoc {
 
     // loop:
     let bufferHasValidSamples = true;
+    let inputSamplesProcessed = 0;
     while (bufferHasValidSamples) {
+      this.trigger('progress', { numSamples: totalInputSamples, samplesRead: inputSamplesProcessed });
+
       inPointer += this.decimation;
       outPointer += this.interpolation;
 
@@ -296,6 +319,7 @@ class Pvoc {
       // await Tapper.flush(); // TAPPR
 
       bufferHasValidSamples = inputBuffer.hasValidData;
+      inputSamplesProcessed += this.decimation;
     }
   }
 

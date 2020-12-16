@@ -83,6 +83,10 @@ class Aiff {
     return this.chunks.COMM.numChannels;
   }
 
+  get numSamples() {
+    return this.chunks.COMM.numSampleFrames;
+  }
+
   // how many bytes are needed to store one sample?
   get sampleStorageBytes() {
     const computation = memoize((sampleSize) => Math.ceil(sampleSize / 8));

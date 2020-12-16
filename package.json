@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "bessel": "^1.0.2",
+    "cli-progress": "^3.8.2",
     "core-js": "^3.8.1",
     "fast-memoize": "^2.5.2",
     "float80": "^1.1.0",

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const yargs = require('yargs');
+const cliProgress = require('cli-progress');
 
 const Pvoc = require('../dist/pvoc.js').default;
 const Aiff = require('../dist/aiff.js').default;
@@ -74,8 +75,26 @@ input.openForRead().then(() => {
 }).then(() => {
   const pvoc = new Pvoc({
     bands: parseInt(b),
-    overlap: parseInt(v),
+    overlap: parseFloat(v),
     scaleFactor: parseFloat(t),
+  });
+
+  const progressBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+  let progressBarStarted = false;
+
+  pvoc.on('progress', ({ numSamples, samplesRead }) => {
+    if (!progressBarStarted) {
+      progressBar.start(numSamples, samplesRead);
+      progressBarStarted = true;
+      return;
+    }
+
+    if (samplesRead > numSamples) {
+      progressBar.update(numSamples);
+      progressBar.stop();
+    } else {
+      progressBar.update(samplesRead);
+    }
   });
 
   return pvoc.run(input, output);
