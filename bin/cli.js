@@ -70,7 +70,7 @@ input.openForRead().then(() => {
   return output.openForWrite({
     sampleRate: input.sampleRate,
     bitDepth: input.bitDepth,
-    numChannels: 1, // only mono right now
+    numChannels: input.numChannels,
   });
 }).then(() => {
   const pvoc = new Pvoc({

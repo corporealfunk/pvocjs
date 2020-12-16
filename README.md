@@ -21,7 +21,6 @@ npm
 
 # Limitations:
 
-- only the first channel of the input will be processed.
 - the Aiff writer does not guard against writing files larger than the format allows (~4GB) which will cause integer wrap-around in the headers, potentially corrupting the file.
 - only AIFF files are readable. Files in AIFF-C format are not readable (including AIFF-C/swot little endian files). Throws an error if you try it.
 - only Hamming windows are used for windowing before doing the FFT and for the Overlap Add resynthesis step.

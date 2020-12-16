@@ -181,7 +181,7 @@ var Pvoc = /*#__PURE__*/function () {
     key: "run",
     value: function () {
       var _run = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(inputSoundData, outputSoundData) {
-        var totalInputSamples, analysisWindow, synthesisWindow, _scaleWindows, scaledAnalysisWindow, scaledSynthesisWindow, inPointer, outPointer, inputBuffer, outputBuffer, samplesIterator, bufferHasValidSamples, inputSamplesProcessed, _samplesIterator$next, value, channels, channel, i, foldedSamples, spectrum, polarSpectrum, cartSpectrum, fftResynth, writeToDisk;
+        var totalInputSamples, analysisWindow, synthesisWindow, _scaleWindows, scaledAnalysisWindow, scaledSynthesisWindow, inPointer, outPointer, inputBuffers, outputBuffers, samplesIterator, bufferHasValidSamples, inputSamplesProcessed, _samplesIterator$next, value, channels, c, channel, i, _c, writeToDisk, _c2;
 
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
@@ -202,8 +202,8 @@ var Pvoc = /*#__PURE__*/function () {
                 outPointer = inPointer * this.interpolation / this.decimation;
                 outPointer = outPointer < 0 ? Math.floor(outPointer) : Math.ceil(outPointer); // only do mono right now:
 
-                inputBuffer = new _sliding_buffer.default(this.windowSize);
-                outputBuffer = new _sliding_buffer.default(this.windowSize); // every time we ge samples we need the decimation length:
+                inputBuffers = [];
+                outputBuffers = []; // every time we ge samples we need the decimation length:
 
                 samplesIterator = inputSoundData.samplesIterator(this.decimation); // loop:
 
@@ -212,7 +212,7 @@ var Pvoc = /*#__PURE__*/function () {
 
               case 12:
                 if (!bufferHasValidSamples) {
-                  _context.next = 43;
+                  _context.next = 32;
                   break;
                 }
 
@@ -226,7 +226,7 @@ var Pvoc = /*#__PURE__*/function () {
                 _samplesIterator$next = samplesIterator.next(), value = _samplesIterator$next.value; // if we have samples from the file, get those,
 
                 if (!value) {
-                  _context.next = 26;
+                  _context.next = 24;
                   break;
                 }
 
@@ -235,111 +235,61 @@ var Pvoc = /*#__PURE__*/function () {
 
               case 20:
                 channels = _context.sent;
-                channel = channels[0]; // pad with 0's to match decimation length if needed:
 
-                for (i = 0; i < this.decimation - channel.length; i++) {
-                  channel.push(0);
-                } // Tapper.accumulate('raw_samples_padded', channel); // TAPPR
+                // pad with 0's to match decimation length if needed:
+                for (c = 0; c < channels.length; c++) {
+                  channel = channels[c];
 
+                  for (i = 0; i < this.decimation - channel.length; i++) {
+                    channel.push(0);
+                  }
 
-                inputBuffer.shiftIn(channel);
-                _context.next = 27;
+                  if (!inputBuffers[c]) {
+                    inputBuffers[c] = new _sliding_buffer.default(this.windowSize);
+                  }
+
+                  if (!outputBuffers[c]) {
+                    outputBuffers[c] = new _sliding_buffer.default(this.windowSize);
+                  }
+
+                  inputBuffers[c].shiftIn(channel);
+                }
+
+                _context.next = 25;
                 break;
 
-              case 26:
-                inputBuffer.shiftLeft(this.decimation);
+              case 24:
+                // no valid samples, so shift the buffer over over
+                for (_c = 0; _c < inputBuffers.length; _c++) {
+                  inputBuffers[_c].shiftLeft(this.decimation);
+                }
 
-              case 27:
-                // Tapper.accumulate('input_buffer', inputBuffer.buffer); // TAPPR
-                // Tapper.accumulate('a_window', analysisWindow); // TAPPR
-                // Tapper.accumulate('scaled_a_window', scaledAnalysisWindow); // TAPPR
-                // Tapper.accumulate('s_window', synthesisWindow); // TAPPR
-                // Tapper.accumulate('scaled_s_window', scaledSynthesisWindow); // TAPPR
-                // Tapper.accumulate('in_pointer', [inPointer]); // TAPPR
-                // window fold:
-                foldedSamples = this.windowFold({
-                  inputSamples: inputBuffer.buffer,
-                  analysisWindow: scaledAnalysisWindow,
-                  currentTime: inPointer,
-                  points: this.points,
-                  windowSize: this.windowSize
-                }); // Tapper.accumulate('folded_samples', foldedSamples); // TAPPR
-                // FFT in-place:
+              case 25:
+                // process each channel
+                writeToDisk = [];
 
-                (0, _fft.RealFFT)({
-                  data: foldedSamples,
-                  halfPoints: this.halfPoints,
-                  direction: _fft.FFT_TIME2FREQ
-                }); // foldedSamples now contains the spectrum for each band:
-
-                spectrum = foldedSamples; // Tapper.accumulate('spectrum', spectrum); // TAPPR
-                // get a polar spectrum out of it:
-
-                polarSpectrum = (0, _spectral_processing.cartToPolar)({
-                  spectrum: spectrum,
-                  halfPoints: this.halfPoints
-                }); // Tapper.accumulate('polar_spectrum', polarSpectrum); // TAPPR
-                // constrain amplitudes in place:
-
-                (0, _spectral_processing.simpleSpectralGate)({
-                  polarSpectrum: polarSpectrum,
-                  maskRatio: 0,
-                  // seems to always be 0 in SoundHack
-                  minAmplitude: 0,
-                  // seems to always be 0 in SoundHack
-                  halfPoints: this.halfPoints
-                }); // Tapper.accumulate('polar_spectrum_constrained', polarSpectrum); // TAPPR
-                // phase interpolate in place:
-
-                (0, _spectral_processing.phaseInterpolate)({
-                  polarSpectrum: polarSpectrum,
-                  halfPoints: this.halfPoints,
-                  decimation: this.decimation,
-                  scaleFactor: this.scaleFactor,
-                  phaseLocking: false // seems to always be false in SoundHack
-
-                }); // Tapper.accumulate('polar_spectrum_phase_interpolated', polarSpectrum); // TAPPR
-
-                cartSpectrum = (0, _spectral_processing.polarToCart)({
-                  polarSpectrum: polarSpectrum,
-                  halfPoints: this.halfPoints
-                }); // Tapper.accumulate('cart_spectrum', cartSpectrum); // TAPPR
-                // spectrum to samples in place:
-
-                (0, _fft.RealFFT)({
-                  data: cartSpectrum,
-                  halfPoints: this.halfPoints,
-                  FFT_FREQ2TIME: _fft.FFT_FREQ2TIME
-                });
-                fftResynth = cartSpectrum; // Tapper.accumulate('fft_resynth', fftResynth); // TAPPR
-                // Tapper.accumulate('output_buffer_b4', outputBuffer.buffer); // TAPPR
-                // Tapper.accumulate('out_pointer', [outPointer]); // TAPPR
-                // overlap add into the contents of our buffer
-
-                this.overlapAdd({
-                  inputSamples: fftResynth,
-                  synthesisWindow: scaledSynthesisWindow,
-                  outputBuffer: outputBuffer.buffer,
-                  currentTime: outPointer,
-                  points: this.points,
-                  windowSize: this.windowSize
-                }); // Tapper.accumulate('output_buffer_after', outputBuffer.buffer); // TAPPR
-
-                writeToDisk = outputBuffer.shiftLeft(this.interpolation);
+                for (_c2 = 0; _c2 < inputBuffers.length; _c2++) {
+                  this.processBlock({
+                    inputBuffer: inputBuffers[_c2],
+                    outputBuffer: outputBuffers[_c2],
+                    scaledAnalysisWindow: scaledAnalysisWindow,
+                    scaledSynthesisWindow: scaledSynthesisWindow,
+                    inPointer: inPointer,
+                    outPointer: outPointer
+                  });
+                  writeToDisk[_c2] = outputBuffers[_c2].shiftLeft(this.interpolation);
+                }
 
                 if (outPointer >= 0) {
-                  // Tapper.accumulate('write_to_disk', writeToDisk); // TAPPR
-                  outputSoundData.writeSamples([writeToDisk]);
-                } else {// Tapper.accumulate('write_to_disk', [0]); // TAPPR
-                } // await Tapper.flush(); // TAPPR
+                  outputSoundData.writeSamples(writeToDisk);
+                }
 
-
-                bufferHasValidSamples = inputBuffer.hasValidData;
+                bufferHasValidSamples = inputBuffers.length > 0 ? inputBuffers[0].hasValidData : false;
                 inputSamplesProcessed += this.decimation;
                 _context.next = 12;
                 break;
 
-              case 43:
+              case 32:
               case "end":
                 return _context.stop();
             }
@@ -408,6 +358,75 @@ var Pvoc = /*#__PURE__*/function () {
           timeIndex = 0;
         }
       }
+    }
+  }, {
+    key: "processBlock",
+    value: function processBlock(_ref5) {
+      var inputBuffer = _ref5.inputBuffer,
+          outputBuffer = _ref5.outputBuffer,
+          scaledAnalysisWindow = _ref5.scaledAnalysisWindow,
+          scaledSynthesisWindow = _ref5.scaledSynthesisWindow,
+          inPointer = _ref5.inPointer,
+          outPointer = _ref5.outPointer;
+      // window fold:
+      var foldedSamples = this.windowFold({
+        inputSamples: inputBuffer.buffer,
+        analysisWindow: scaledAnalysisWindow,
+        currentTime: inPointer,
+        points: this.points,
+        windowSize: this.windowSize
+      }); // FFT in-place:
+
+      (0, _fft.RealFFT)({
+        data: foldedSamples,
+        halfPoints: this.halfPoints,
+        direction: _fft.FFT_TIME2FREQ
+      }); // foldedSamples now contains the spectrum for each band:
+
+      var spectrum = foldedSamples; // get a polar spectrum out of it:
+
+      var polarSpectrum = (0, _spectral_processing.cartToPolar)({
+        spectrum: spectrum,
+        halfPoints: this.halfPoints
+      }); // constrain amplitudes in place:
+
+      (0, _spectral_processing.simpleSpectralGate)({
+        polarSpectrum: polarSpectrum,
+        maskRatio: 0,
+        // seems to always be 0 in SoundHack
+        minAmplitude: 0,
+        // seems to always be 0 in SoundHack
+        halfPoints: this.halfPoints
+      }); // phase interpolate in place:
+
+      (0, _spectral_processing.phaseInterpolate)({
+        polarSpectrum: polarSpectrum,
+        halfPoints: this.halfPoints,
+        decimation: this.decimation,
+        scaleFactor: this.scaleFactor,
+        phaseLocking: false // seems to always be false in SoundHack
+
+      });
+      var cartSpectrum = (0, _spectral_processing.polarToCart)({
+        polarSpectrum: polarSpectrum,
+        halfPoints: this.halfPoints
+      }); // spectrum to samples in place:
+
+      (0, _fft.RealFFT)({
+        data: cartSpectrum,
+        halfPoints: this.halfPoints,
+        FFT_FREQ2TIME: _fft.FFT_FREQ2TIME
+      });
+      var fftResynth = cartSpectrum; // overlap add into the contents of our buffer
+
+      this.overlapAdd({
+        inputSamples: fftResynth,
+        synthesisWindow: scaledSynthesisWindow,
+        outputBuffer: outputBuffer.buffer,
+        currentTime: outPointer,
+        points: this.points,
+        windowSize: this.windowSize
+      });
     }
   }]);
 
