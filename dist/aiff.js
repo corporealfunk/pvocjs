@@ -23,8 +23,6 @@ exports.default = void 0;
 
 require("regenerator-runtime/runtime");
 
-var _fastMemoize = _interopRequireDefault(require("fast-memoize"));
-
 var _float = require("float80");
 
 var _file_buffer = _interopRequireDefault(require("./file_buffer"));
@@ -863,48 +861,52 @@ var Aiff = /*#__PURE__*/function () {
   }, {
     key: "sampleStorageBytes",
     get: function get() {
-      var computation = (0, _fastMemoize.default)(function (sampleSize) {
-        return Math.ceil(sampleSize / 8);
-      });
-      var result = computation(this.chunks.COMM.sampleSize);
-      return result;
+      if (this._sampleStorageBytes === undefined) {
+        this._sampleStorageBytes = Math.ceil(this.bitDepth / 8);
+      }
+
+      return this._sampleStorageBytes;
     } // how many bits are at the end of the sample that are zero pads?
 
   }, {
     key: "sampleZeroPadBits",
     get: function get() {
-      var computation = (0, _fastMemoize.default)(function (sampleStorageBytes, sampleSize) {
-        return sampleStorageBytes * 8 - sampleSize;
-      });
-      return computation(this.sampleStorageBytes, this.chunks.COMM.sampleSize);
+      if (this._sampleZeroPadBits === undefined) {
+        this._sampleZeroPadBits = this.sampleStorageBytes * 8 - this.bitDepth;
+      }
+
+      return this._sampleZeroPadBits;
     } // how many bytes are in each sample frame?
 
   }, {
     key: "sampleFrameSize",
     get: function get() {
-      var computation = (0, _fastMemoize.default)(function (sampleStorageBytes, numChannels) {
-        return sampleStorageBytes * numChannels;
-      });
-      return computation(this.sampleStorageBytes, this.chunks.COMM.numChannels);
+      if (this._sampleFrameSize === undefined) {
+        this._sampleFrameSize = this.sampleStorageBytes * this.numChannels;
+      }
+
+      return this._sampleFrameSize;
     } // at which byte index the sound data starts in the file:
 
   }, {
     key: "soundDataStart",
     get: function get() {
-      var computation = (0, _fastMemoize.default)(function (start) {
-        return start + 16;
-      });
-      return computation(this.chunks.SSND.start);
+      if (this._soundDataStart === undefined) {
+        this._soundDataStart = this.chunks.SSND.start + 16;
+      }
+
+      return this._soundDataStart;
     } // helper to return a two element array of low and high sample value range
     // based on bit depth
 
   }, {
     key: "bitDepthRange",
     get: function get() {
-      var computation = (0, _fastMemoize.default)(function (bitDepth) {
-        return [-Math.pow(2, bitDepth - 1), Math.pow(2, bitDepth - 1) - 1];
-      });
-      return computation(this.chunks.COMM.sampleSize);
+      if (this._bitDepthRange === undefined) {
+        this._bitDepthRange = [-Math.pow(2, this.bitDepth - 1), Math.pow(2, this.bitDepth - 1) - 1];
+      }
+
+      return this._bitDepthRange;
     }
   }]);
 

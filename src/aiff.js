@@ -1,6 +1,5 @@
 /* eslint-disable no-multi-spaces */
 
-import memoize from 'fast-memoize';
 import { Float80 } from 'float80';
 import FileBuffer from './file_buffer';
 import { floatToExtended } from './utilties';
@@ -89,39 +88,47 @@ class Aiff {
 
   // how many bytes are needed to store one sample?
   get sampleStorageBytes() {
-    const computation = memoize((sampleSize) => Math.ceil(sampleSize / 8));
-    const result = computation(this.chunks.COMM.sampleSize);
-    return result;
+    if (this._sampleStorageBytes === undefined) {
+      this._sampleStorageBytes = Math.ceil(this.bitDepth / 8);
+    }
+    return this._sampleStorageBytes;
   }
 
   // how many bits are at the end of the sample that are zero pads?
   get sampleZeroPadBits() {
-    const computation = memoize((sampleStorageBytes, sampleSize) => (
-      (sampleStorageBytes * 8) - sampleSize
-    ));
-    return computation(this.sampleStorageBytes, this.chunks.COMM.sampleSize);
+    if (this._sampleZeroPadBits === undefined) {
+      this._sampleZeroPadBits = (this.sampleStorageBytes * 8) - this.bitDepth;
+    }
+    return this._sampleZeroPadBits;
   }
 
   // how many bytes are in each sample frame?
   get sampleFrameSize() {
-    const computation = memoize((sampleStorageBytes, numChannels) => sampleStorageBytes * numChannels);
-    return computation(this.sampleStorageBytes, this.chunks.COMM.numChannels);
+    if (this._sampleFrameSize === undefined) {
+      this._sampleFrameSize = this.sampleStorageBytes * this.numChannels;
+    }
+    return this._sampleFrameSize;
   }
 
   // at which byte index the sound data starts in the file:
   get soundDataStart() {
-    const computation = memoize(start => start + 16);
-    return computation(this.chunks.SSND.start);
+    if (this._soundDataStart === undefined) {
+      this._soundDataStart = this.chunks.SSND.start + 16;
+    }
+
+    return this._soundDataStart;
   }
 
   // helper to return a two element array of low and high sample value range
   // based on bit depth
   get bitDepthRange() {
-    const computation = memoize(bitDepth => [
-      -(2 ** (bitDepth - 1)),
-      (2 ** (bitDepth - 1) -1),
-    ]);
-    return computation(this.chunks.COMM.sampleSize);
+    if (this._bitDepthRange === undefined) {
+      this._bitDepthRange = [
+        -(2 ** (this.bitDepth - 1)),
+        (2 ** (this.bitDepth - 1) -1),
+      ];
+    }
+    return this._bitDepthRange;
   }
 
   async openForRead() {
