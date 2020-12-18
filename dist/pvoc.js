@@ -212,7 +212,7 @@ var Pvoc = /*#__PURE__*/function () {
 
               case 12:
                 if (!bufferHasValidSamples) {
-                  _context.next = 32;
+                  _context.next = 34;
                   break;
                 }
 
@@ -280,16 +280,21 @@ var Pvoc = /*#__PURE__*/function () {
                   writeToDisk[_c2] = outputBuffers[_c2].shiftLeft(this.interpolation);
                 }
 
-                if (outPointer >= 0) {
-                  outputSoundData.writeSamples(writeToDisk);
+                if (!(outPointer >= 0)) {
+                  _context.next = 30;
+                  break;
                 }
 
+                _context.next = 30;
+                return outputSoundData.writeSamples(writeToDisk);
+
+              case 30:
                 bufferHasValidSamples = inputBuffers.length > 0 ? inputBuffers[0].hasValidData : false;
                 inputSamplesProcessed += this.decimation;
                 _context.next = 12;
                 break;
 
-              case 32:
+              case 34:
               case "end":
                 return _context.stop();
             }

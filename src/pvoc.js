@@ -245,7 +245,7 @@ class Pvoc {
       }
 
       if (outPointer >= 0) {
-        outputSoundData.writeSamples(writeToDisk);
+        await outputSoundData.writeSamples(writeToDisk);
       }
 
       bufferHasValidSamples = inputBuffers.length > 0 ? inputBuffers[0].hasValidData : false;
